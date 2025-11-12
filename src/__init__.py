@@ -2,4 +2,4 @@
 dialogos_a_español - Conversor de diálogos narrativos al formato editorial español.
 """
 
-__version__ = "1.2.1"
+__version__ = "1.3.0"

@@ -45,7 +45,7 @@ def setup_argparse() -> argparse.ArgumentParser:
     parser.add_argument(
         '--version',
         action='version',
-        version='dialogos_a_español 1.2.1'
+        version='dialogos_a_español 1.3.0'
     )
     
     return parser

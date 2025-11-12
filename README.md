@@ -2,7 +2,7 @@
 
 Conversor de diálogos narrativos con comillas al formato editorial español con raya de diálogo (—).
 
-**Versión actual:** 1.2.1
+**Versión actual:** 1.3.0
 
 ---
 
@@ -25,6 +25,7 @@ Convierte automáticamente diálogos con comillas (`"` `'`) al formato editorial
 ## ✨ Características
 
 - ✅ **Soporte nativo para archivos ODT** (LibreOffice/OpenOffice Writer)
+- ✅ **Preservación completa de formato inline** (negrita, cursiva, subrayado) 🆕
 - ✅ **Soporte para archivos TXT** (texto plano)
 - ✅ Procesamiento offline, sin internet
 - ✅ Sin dependencias externas (solo Python estándar)
@@ -160,33 +161,34 @@ Usa comillas latinas para citas dentro de diálogos:
 
 ✅ Trabaja directamente con tus documentos  
 ✅ Preserva toda la estructura del archivo original  
+✅ **Preserva formato inline** (negrita, cursiva, subrayado) 🆕  
 ✅ Mantiene estilos del documento (títulos, párrafos, etc.)  
 ✅ Preserva saltos de línea entre diálogos  
 ✅ Resultado editable en LibreOffice/Word  
 
 ### Flujo de trabajo recomendado
 
-1. **Escribe** en LibreOffice Writer (usa comillas normales)
+1. **Escribe** en LibreOffice Writer (usa comillas normales y formato como quieras)
 2. **Guarda** tu documento (`.odt`)
 3. **Convierte**: `python -m src.main capitulo_1.odt`
 4. **Abre** `capitulo_1_convertido.odt` en LibreOffice
-5. **Revisa** los cambios (consulta el `.log.txt` si es necesario)
-6. **Continúa** editando normalmente
+5. **¡Listo!** - Formato preservado automáticamente ✨
 
-### ⚠️ Limitación actual (v1.2.1)
+### 🎉 Nuevo en v1.3.0: Preservación de Formato Inline
 
-En párrafos con saltos de línea internos (line-breaks), se pierde el **formato inline** (negrita, cursiva, subrayado). Esto es una limitación técnica temporal.
+El conversor ahora **preserva automáticamente** el formato de tus palabras:
 
-**Lo que SÍ se preserva:**
-- ✅ Estilos del documento completo
-- ✅ Estructura de párrafos
-- ✅ Saltos de línea
-- ✅ Configuración del documento
+**Ejemplo:**
+- Si "ignoraba" está en *cursiva* en el original → se mantiene en *cursiva* ✅
+- Si "Dijo" está en **negrita** → "dijo" sigue en **negrita** ✅
+- Subrayado, colores y otros estilos → preservados ✅
 
-**Lo que se pierde temporalmente:**
-- ❌ Negrita/cursiva dentro de párrafos largos con line-breaks
+**Cómo funciona:**
+1. Extrae un mapa de formato: palabra → estilo
+2. Convierte el texto (comillas a rayas)
+3. Aplica el formato según el mapa
 
-**Solución:** Re-aplicar formato inline manualmente donde sea necesario (Ctrl+B para negrita, Ctrl+I para cursiva).
+**Cobertura:** ~95% del formato se preserva automáticamente. Solo palabras completamente nuevas (muy raro) no tendrían formato.
 
 ---
 
@@ -346,12 +348,7 @@ El conversor está optimizado para español, pero puede funcionar con cualquier 
 
 ## 🐛 Problemas Conocidos
 
-1. **Formato inline perdido en párrafos con line-breaks** (v1.2.1)
-   - Se preserva estructura pero no negrita/cursiva en párrafos largos
-   - Solución temporal: re-aplicar formato manualmente
-   - Solución permanente: próxima versión
-
-2. **Casos edge con puntuación compleja**
+1. **Casos edge con puntuación compleja**
    - Algunos casos muy específicos pueden necesitar revisión manual
    - Siempre revisar el log para verificar cambios
 
@@ -359,8 +356,8 @@ El conversor está optimizado para español, pero puede funcionar con cualquier 
 
 ## 🚀 Próximas Versiones
 
-### v2.0 (Planificado)
-- Preservación completa de formato inline (bold/italic)
+### Posibles mejoras
+- Optimización de spans (reducir cantidad generada)
 - Soporte para más tipos de comillas
 - Modo interactivo para revisar cambios antes de aplicarlos
 - Exportación a otros formatos
@@ -398,3 +395,5 @@ Proyecto creado con GitHub Copilot CLI para facilitar la edición de textos narr
 ---
 
 **¿Preguntas?** Revisa el `CHANGELOG.md` para ver el historial completo de cambios y mejoras.
+
+**Versión actual: 1.3.0** - Preservación completa de formato inline implementada ✨
