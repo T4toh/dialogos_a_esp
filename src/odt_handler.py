@@ -121,13 +121,18 @@ class ODTProcessor:
         """
         Convierte texto preservando line-breaks Y formato (spans, bold, italic).
         
-        Este método es más inteligente: en lugar de reconstruir todo el párrafo,
-        modifica el texto IN-PLACE preservando toda la estructura de elementos.
+        NUEVA ESTRATEGIA: Mapeo de formato palabra por palabra
+        1. Extraer mapa de formato del original (palabra → estilo)
+        2. Convertir el texto
+        3. Reconstruir aplicando el formato según el mapa
         """
-        # Extraer segmentos de texto entre line-breaks
+        # 1. Extraer mapa de formato ANTES de modificar
+        format_map = self._extract_format_map(element)
+        
+        # 2. Extraer segmentos de texto entre line-breaks
         segments = self._extract_text_segments_smart(element)
         
-        # Convertir cada segmento
+        # 3. Convertir cada segmento
         converted_segments = []
         for seg in segments:
             if seg.strip():
@@ -136,8 +141,8 @@ class ODTProcessor:
             else:
                 converted_segments.append(seg)
         
-        # Aplicar conversiones IN-PLACE sin destruir la estructura
-        self._apply_text_changes_inplace(element, segments, converted_segments)
+        # 4. Reconstruir preservando formato según mapa
+        self._rebuild_with_format_map(element, converted_segments, format_map)
     
     def _extract_text_segments_smart(self, element) -> list:
         """
@@ -173,6 +178,206 @@ class ODTProcessor:
             segments.append(''.join(current_text))
         
         return segments
+    
+    def _extract_format_map(self, element) -> dict:
+        """
+        Extrae un mapa de palabra normalizada → estilo de span.
+        
+        Returns:
+            Dict con estructura:
+            {
+                'palabra_normalizada': [
+                    {'style': 'T1', 'original': 'Palabra'},
+                    ...
+                ]
+            }
+        """
+        format_map = {}
+        
+        def normalize_word(word: str) -> str:
+            """Normaliza palabra para matching (lowercase, sin puntuación)."""
+            import re
+            # Quitar puntuación pero mantener contenido
+            cleaned = re.sub(r'[.,;:!?¿¡"\'"''"—\(\)\[\]{}]', '', word)
+            return cleaned.lower().strip()
+        
+        def extract_words_with_format(elem, current_style=None):
+            """Extrae palabras con su estilo asociado."""
+            tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+            
+            # Si es un span, capturar el estilo
+            if tag == 'span':
+                ns_text = '{urn:oasis:names:tc:opendocument:xmlns:text:1.0}'
+                style_attr = f'{ns_text}style-name'
+                current_style = elem.attrib.get(style_attr, None)
+            
+            # Procesar texto del elemento
+            if elem.text and current_style:
+                words = elem.text.split()
+                for word in words:
+                    norm_word = normalize_word(word)
+                    if norm_word:  # Solo si queda algo después de normalizar
+                        if norm_word not in format_map:
+                            format_map[norm_word] = []
+                        format_map[norm_word].append({
+                            'style': current_style,
+                            'original': word
+                        })
+            
+            # Procesar hijos recursivamente
+            for child in elem:
+                extract_words_with_format(child, current_style)
+                
+                # Procesar tail (texto después del hijo)
+                if child.tail and current_style:
+                    words = child.tail.split()
+                    for word in words:
+                        norm_word = normalize_word(word)
+                        if norm_word:
+                            if norm_word not in format_map:
+                                format_map[norm_word] = []
+                            format_map[norm_word].append({
+                                'style': current_style,
+                                'original': word
+                            })
+        
+        extract_words_with_format(element)
+        return format_map
+    
+    def _rebuild_with_format_map(self, element, segments: list, format_map: dict):
+        """
+        Reconstruye el párrafo con line-breaks Y formato aplicado según mapa.
+        
+        Args:
+            element: Elemento XML del párrafo
+            segments: Lista de segmentos de texto convertido
+            format_map: Mapa de palabra normalizada → estilo
+        """
+        import re
+        
+        def normalize_word(word: str) -> str:
+            """Normaliza palabra para matching."""
+            cleaned = re.sub(r'[.,;:!?¿¡"\'"''"—()\[\]{}]', '', word)
+            return cleaned.lower().strip()
+        
+        def get_word_style(word: str) -> str:
+            """Obtiene el estilo de una palabra desde el mapa."""
+            norm_word = normalize_word(word)
+            if norm_word in format_map and format_map[norm_word]:
+                # Usar el primer estilo encontrado para esa palabra
+                return format_map[norm_word][0]['style']
+            return None
+        
+        def split_preserving_spaces(text: str):
+            """Divide texto en tokens (palabras con espacios antes/después)."""
+            # Patrón mejorado que captura palabra + espacio siguiente
+            # O simplemente espacios al inicio/final
+            parts = []
+            current_pos = 0
+            
+            # Regex para encontrar palabras (incluyendo puntuación pegada)
+            word_pattern = re.compile(r'\S+')
+            
+            for match in word_pattern.finditer(text):
+                start, end = match.span()
+                
+                # Añadir espacios previos si los hay
+                if start > current_pos:
+                    spaces_before = text[current_pos:start]
+                    if parts:
+                        # Añadir espacios al token anterior
+                        parts[-1] = parts[-1] + spaces_before
+                    else:
+                        # Primera palabra, añadir como token separado
+                        parts.append(spaces_before)
+                
+                # Añadir la palabra
+                word = text[start:end]
+                parts.append(word)
+                current_pos = end
+            
+            # Añadir espacios finales si los hay
+            if current_pos < len(text):
+                parts[-1] = parts[-1] + text[current_pos:]
+            
+            return parts
+        
+        # Guardar atributos del párrafo
+        attribs = element.attrib.copy()
+        
+        # Limpiar elemento
+        element.clear()
+        element.attrib.update(attribs)
+        
+        # Namespaces
+        ns_text = '{urn:oasis:names:tc:opendocument:xmlns:text:1.0}'
+        
+        # Procesar cada segmento
+        for seg_idx, segment_text in enumerate(segments):
+            if seg_idx > 0:
+                # Añadir line-break entre segmentos
+                lb = ET.SubElement(element, f'{ns_text}line-break')
+                # El texto del segmento irá en el tail del line-break
+                
+            # Dividir el segmento en palabras
+            words = split_preserving_spaces(segment_text)
+            
+            # Agrupar palabras consecutivas con el mismo estilo
+            groups = []
+            current_group_style = None
+            current_group_words = []
+            
+            for word in words:
+                word_stripped = word.strip()
+                if word_stripped:  # Palabra real
+                    word_style = get_word_style(word_stripped)
+                else:  # Solo espacios
+                    word_style = None
+                
+                if word_style == current_group_style:
+                    # Mismo estilo, añadir al grupo actual
+                    current_group_words.append(word)
+                else:
+                    # Cambio de estilo, guardar grupo actual
+                    if current_group_words:
+                        groups.append((current_group_style, ''.join(current_group_words)))
+                    # Iniciar nuevo grupo
+                    current_group_style = word_style
+                    current_group_words = [word]
+            
+            # Guardar último grupo
+            if current_group_words:
+                groups.append((current_group_style, ''.join(current_group_words)))
+            
+            # Crear spans para cada grupo
+            for group_idx, (style, text_content) in enumerate(groups):
+                if seg_idx == 0 and group_idx == 0:
+                    # Primer texto del párrafo
+                    if style:
+                        span = ET.SubElement(element, f'{ns_text}span')
+                        span.attrib[f'{ns_text}style-name'] = style
+                        span.text = text_content
+                    else:
+                        element.text = text_content
+                else:
+                    # Resto del contenido
+                    if style:
+                        span = ET.SubElement(element, f'{ns_text}span')
+                        span.attrib[f'{ns_text}style-name'] = style
+                        span.text = text_content
+                    else:
+                        # Texto sin estilo - añadir al tail del último elemento
+                        if len(element) > 0:
+                            last_elem = element[-1]
+                            if last_elem.tail:
+                                last_elem.tail += text_content
+                            else:
+                                last_elem.tail = text_content
+                        else:
+                            if element.text:
+                                element.text += text_content
+                            else:
+                                element.text = text_content
     
     def _apply_text_changes_inplace(self, element, originals: list, converted: list):
         """
