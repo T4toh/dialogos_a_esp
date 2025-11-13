@@ -58,9 +58,17 @@ class DialogConverter:
         original_line = line
         
         # Aplicar conversiones en orden de prioridad
-        line = self._convert_dialog_with_tag(line, original_line)
-        line = self._convert_standalone_dialog(line, original_line)
-        line = self._convert_nested_quotes(line, original_line)
+        # Repetir hasta que no haya más comillas (para líneas con múltiples diálogos)
+        max_iterations = 10  # Evitar loops infinitos
+        for _ in range(max_iterations):
+            prev_line = line
+            line = self._convert_dialog_with_tag(line, original_line)
+            line = self._convert_standalone_dialog(line, original_line)
+            line = self._convert_nested_quotes(line, original_line)
+            
+            # Si no cambió, ya terminamos
+            if line == prev_line:
+                break
         
         return line
     
@@ -135,7 +143,8 @@ class DialogConverter:
                 return result
             else:
                 # No es etiqueta, es narración nueva
-                if content.endswith('.'):
+                # No agregar punto si ya termina con puntuación
+                if content.endswith(('.', '?', '!', '…')):
                     result = f'{self.EM_DASH}{content} {word}'
                 else:
                     result = f'{self.EM_DASH}{content}. {word}'
@@ -185,6 +194,8 @@ class DialogConverter:
         """
         Convierte diálogos sin etiqueta (standalone).
         Ejemplo: "Hola, Juan" → —Hola, Juan
+        
+        También maneja múltiples diálogos consecutivos en la misma línea.
         """
         # Solo al inicio de línea o después de espacios (comillas tipográficas y rectas)
         pattern1 = re.compile(r'^(\s*)' + self.QUOTES_PATTERN + r'([^"\u201C\u201D]+)' + self.QUOTES_PATTERN)
@@ -223,24 +234,40 @@ class DialogConverter:
         if new_line == line:
             new_line = pattern2.sub(replace2, new_line)
         
-        # Comillas dobles restantes (no procesadas) - tipográficas y rectas
-        pattern3 = re.compile(self.QUOTES_PATTERN + r'([^"\u201C\u201D]+)' + self.QUOTES_PATTERN)
+        # NUEVO: Comillas que son diálogos adicionales en la misma línea
+        # Patrón: después de un espacio o después de narración
+        # Ejemplo: "Texto1" "Texto2" o Narración. "Texto"
+        # SOLO si NO tiene etiqueta de diálogo antes
         
-        def replace3(match):
-            content = match.group(1)
-            result = f'{self.EM_DASH}{content}'
+        # Verificar si hay comillas restantes que NO son citas internas
+        # (comillas que están al inicio de una frase o después de narración)
+        pattern_additional = re.compile(
+            r'(\s+)' + self.QUOTES_PATTERN + r'([^"\u201C\u201D]+)' + self.QUOTES_PATTERN
+        )
+        
+        def replace_additional(match):
+            space = match.group(1)
+            content = match.group(2)
             
-            self.logger.log_change(
-                self.current_line,
-                match.group(0),
-                result,
-                'D1: Sustitución de delimitadores (restantes)'
-            )
-            return result
+            # Verificar si el contenido parece ser un diálogo completo
+            # (empieza con mayúscula o signos de interrogación/exclamación)
+            if content.strip() and (content[0].isupper() or content.startswith(('¿', '¡'))):
+                result = f'{space}{self.EM_DASH}{content}'
+                
+                self.logger.log_change(
+                    self.current_line,
+                    match.group(0),
+                    result,
+                    'D1: Diálogo adicional en línea'
+                )
+                return result
+            
+            # Si no parece diálogo, no tocar
+            return match.group(0)
         
-        # Solo aplicar si no hay rayas ya
-        if self.EM_DASH not in new_line:
-            new_line = pattern3.sub(replace3, new_line)
+        # Solo aplicar si la línea ya tiene rayas (indica que estamos en contexto de diálogos)
+        if self.EM_DASH in new_line:
+            new_line = pattern_additional.sub(replace_additional, new_line)
         
         return new_line
     
@@ -249,50 +276,46 @@ class DialogConverter:
         Convierte comillas dentro de diálogos a comillas latinas.
         Ejemplo: —Ella me dijo 'te esperaré' → —Ella me dijo «te esperaré»
         
-        IMPORTANTE: No convierte comillas que son continuación del diálogo después de etiqueta.
-        Ejemplo: —Hola —dijo Juan. "¿Cómo estás?" → —Hola —dijo Juan. —¿Cómo estás?
+        IMPORTANTE: NO aplica D5 si las comillas son:
+        1. Continuación de diálogo después de etiqueta
+        2. Nuevo diálogo en la misma línea
+        3. Diálogo al inicio de la línea (ya procesado antes)
+        
+        Solo convierte a latinas si son CITAS DENTRO del diálogo.
         """
         # Solo si la línea ya tiene raya de diálogo
         if self.EM_DASH not in line:
             return line
         
-        # Verificar si hay etiqueta de diálogo seguida de más diálogo
-        # Patrón: —texto —verbo. "más diálogo"
-        # Esto indica continuación del mismo personaje, NO cita interna
-        has_continuation = False
-        for tag in DIALOG_TAGS:
-            # Buscar patrón: —verbo seguido de punto/coma y comillas
-            if re.search(self.EM_DASH + tag + r'\b[^.]*[\.,]\s*' + self.QUOTES_PATTERN, line, re.IGNORECASE):
-                has_continuation = True
-                break
+        # NO aplicar D5 si hay comillas que son diálogos independientes
+        # Casos donde NO debe aplicarse D5:
         
-        # Si hay continuación de diálogo, convertir esas comillas a rayas, no a latinas
-        if has_continuation:
-            # Convertir comillas después de etiqueta de diálogo a rayas
-            pattern_continuation = re.compile(
-                r'(' + self.EM_DASH + r'(?:' + '|'.join(DIALOG_TAGS) + r')\b[^.]*?[\.,]\s*)' +
-                self.QUOTES_PATTERN + r'([^"\u201C\u201D]+)' + self.QUOTES_PATTERN,
-                re.IGNORECASE
-            )
-            
-            def replace_continuation(match):
-                prefix = match.group(1)
-                content = match.group(2)
-                result = f'{prefix}{self.EM_DASH}{content}'
-                
-                self.logger.log_change(
-                    self.current_line,
-                    match.group(0),
-                    result,
-                    'D4: Continuación de diálogo del mismo personaje'
-                )
-                return result
-            
-            line = pattern_continuation.sub(replace_continuation, line)
+        # 1. Comillas al inicio después de espacios (es un diálogo nuevo en la línea)
+        if re.search(r'^\s*' + self.QUOTES_PATTERN, line):
             return line
         
-        # Si no hay continuación, son citas internas → convertir a comillas latinas
-        # Buscar comillas simples dentro de diálogos con raya (tipográficas y rectas)
+        # 2. Comillas después de etiqueta de diálogo (continuación)
+        # Ejemplo: —dijo pensativa. "Más texto"
+        for tag in DIALOG_TAGS:
+            if re.search(self.EM_DASH + tag + r'\b[^"]*?[\.,]\s*' + self.QUOTES_PATTERN, line, re.IGNORECASE):
+                # Es continuación de diálogo, NO cita interna
+                # Ya debería haberse procesado en _convert_dialog_with_tag, pero por las dudas
+                return line
+        
+        # 3. Comillas después de narración con mayúscula (nuevo diálogo)
+        # Ejemplo: —Texto. Narración con mayúscula. "Más diálogo"
+        if re.search(r'\.\s+[A-ZÁÉÍÓÚÑ][^.]*\s*' + self.QUOTES_PATTERN, line):
+            return line
+        
+        # 4. Múltiples diálogos en la misma línea separados por espacio
+        # Ejemplo: "Texto1" "Texto2"
+        # Contar comillas: si hay más de 2 pares, probablemente son diálogos consecutivos
+        quote_count = len(re.findall(self.QUOTES_PATTERN, line))
+        if quote_count >= 4:  # 2 o más pares de comillas
+            return line
+        
+        # Si llegamos acá, son citas internas legítimas
+        # SOLO convertir comillas SIMPLES a latinas (citas dentro de diálogo)
         pattern = re.compile(self.SINGLE_QUOTES_PATTERN + r"([^'\u2018\u2019]+)" + self.SINGLE_QUOTES_PATTERN)
         
         def replace(match):
@@ -308,22 +331,5 @@ class DialogConverter:
             return result
         
         new_line = pattern.sub(replace, line)
-        
-        # También convertir comillas dobles internas (tipográficas y rectas)
-        pattern2 = re.compile(self.QUOTES_PATTERN + r'([^"\u201C\u201D]+)' + self.QUOTES_PATTERN)
-        
-        def replace2(match):
-            content = match.group(1)
-            result = f'«{content}»'
-            
-            self.logger.log_change(
-                self.current_line,
-                match.group(0),
-                result,
-                'D5: Cita interna con comillas latinas'
-            )
-            return result
-        
-        new_line = pattern2.sub(replace2, new_line)
         
         return new_line

@@ -6,6 +6,35 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [1.3.1] - 2025-01-12
+
+### 🐛 Corregido
+
+- **Puntuación incorrecta después de signos de interrogación/exclamación**
+  - Ya no agrega `.` después de `?`, `!` o `…` en regla D3
+  - Ejemplo corregido: `"¿Sos de Arbor?" Aedan` → `—¿Sos de Arbor? Aedan` (antes incorrectamente: `—¿Sos de Arbor?. Aedan`)
+
+- **Regla D5 (citas internas) aplicada incorrectamente a diálogos consecutivos**
+  - D5 ahora solo se aplica a citas legítimas dentro de un diálogo
+  - NO se aplica a:
+    - Diálogos consecutivos en la misma línea
+    - Continuación de diálogo después de etiqueta
+    - Nuevo diálogo después de narración
+  - Ejemplo corregido: `"Hola" dijo Juan. "Chau"` → `—Hola —dijo Juan. —Chau` (antes incorrectamente: `—Hola —dijo Juan. «Chau»`)
+
+- **Diálogos consecutivos no detectados**
+  - Implementada detección de diálogos adicionales en la misma línea
+  - Ejemplo: `"Texto1" "Texto2"` ahora convierte ambos correctamente a rayas
+  - Nueva regla: "D1: Diálogo adicional en línea"
+
+### 🔧 Técnico
+
+- Mejorado `_convert_nested_quotes()` con verificaciones más estrictas
+- Añadida detección de diálogos múltiples en `_convert_standalone_dialog()`
+- Corregido bug en `main.py` para acceder al logger en archivos ODT
+
+---
+
 ## [1.3.0] - 2025-01-12
 
 ### 🎉 Añadido - IMPORTANTE

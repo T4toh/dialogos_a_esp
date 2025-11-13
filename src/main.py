@@ -1,173 +1,193 @@
 """
-CLI principal para la conversión de diálogos.
+Script principal para conversión de diálogos.
+Soporta archivos individuales y procesamiento de carpetas.
 """
 
-import argparse
 import sys
 from pathlib import Path
-from typing import Optional
-
+import argparse
 from .converter import DialogConverter
-from .odt_handler import ODTReader, ODTWriter, ODTProcessor, is_odt_file
+from .odt_handler import is_odt_file, ODTReader, ODTProcessor
+from .batch_processor import BatchProcessor
 
 
-def setup_argparse() -> argparse.ArgumentParser:
-    """
-    Configura el parser de argumentos de línea de comandos.
-    
-    Returns:
-        ArgumentParser configurado
-    """
+def create_parser():
+    """Crea y configura el parser de argumentos."""
     parser = argparse.ArgumentParser(
-        description='Convierte diálogos narrativos con comillas al formato editorial español con raya (—).',
-        epilog='Genera dos archivos: texto convertido (.txt) y log detallado (.log.txt)'
+        description='Convierte diálogos con comillas al formato español con raya (—)',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Ejemplos de uso:
+
+  # Archivo individual
+  python -m src.main mi_capitulo.odt
+  
+  # Carpeta completa (crea subcarpeta 'convertidos/')
+  python -m src.main mi_novela/
+  
+  # Especificar carpeta de salida
+  python -m src.main mi_novela/ -o resultados/
+  
+  # Solo archivos ODT
+  python -m src.main mi_novela/ --filter "*.odt"
+  
+  # Incluir subcarpetas
+  python -m src.main mi_novela/ --recursive
+
+Para más información, ver README.md
+        """
     )
     
     parser.add_argument(
-        'input_file',
+        'input',
         type=str,
-        help='Archivo de texto de entrada con diálogos entre comillas'
+        help='Archivo o carpeta a procesar (.txt, .odt)'
     )
     
     parser.add_argument(
         '-o', '--output',
         type=str,
-        default=None,
-        help='Archivo de salida (por defecto: {input}_convertido.txt)'
+        help='Archivo o carpeta de salida (default: _convertido o subcarpeta convertidos/)'
+    )
+    
+    parser.add_argument(
+        '--filter',
+        type=str,
+        default='*.*',
+        help='Patrón de archivos en modo carpeta (ej: "*.odt")'
+    )
+    
+    parser.add_argument(
+        '--recursive',
+        action='store_true',
+        help='Procesar subcarpetas (solo en modo carpeta)'
     )
     
     parser.add_argument(
         '-q', '--quiet',
         action='store_true',
-        help='Modo silencioso (no mostrar estadísticas)'
+        help='Modo silencioso'
     )
     
     parser.add_argument(
         '--version',
         action='version',
-        version='dialogos_a_español 1.3.0'
+        version='dialogos_a_español 1.4.0'
     )
     
     return parser
 
 
-def determine_output_path(input_path: Path, output_arg: Optional[str]) -> Path:
-    """
-    Determina la ruta del archivo de salida.
-    
-    Args:
-        input_path: Ruta del archivo de entrada
-        output_arg: Argumento de salida (puede ser None)
-        
-    Returns:
-        Path del archivo de salida
-    """
-    if output_arg:
-        return Path(output_arg)
-    
-    # Por defecto: {nombre}_convertido.txt
-    stem = input_path.stem
-    return input_path.parent / f"{stem}_convertido.txt"
-
-
 def main():
-    """Función principal del CLI."""
-    parser = setup_argparse()
+    """Función principal."""
+    parser = create_parser()
     args = parser.parse_args()
     
-    # Validar archivo de entrada
-    input_path = Path(args.input_file)
+    # Validar entrada
+    input_path = Path(args.input)
     if not input_path.exists():
-        print(f"Error: El archivo '{args.input_file}' no existe.", file=sys.stderr)
+        print(f"Error: No existe '{args.input}'")
         sys.exit(1)
     
-    if not input_path.is_file():
-        print(f"Error: '{args.input_file}' no es un archivo.", file=sys.stderr)
-        sys.exit(1)
+    # Determinar modo
+    if input_path.is_dir():
+        process_directory(input_path, args)
+    else:
+        process_file(input_path, args)
+
+
+def process_directory(input_dir: Path, args):
+    """Procesa una carpeta completa."""
+    output_dir = Path(args.output) if args.output else input_dir / "convertidos"
     
-    # Detectar si es ODT
-    is_odt = is_odt_file(input_path)
+    converter = DialogConverter()
+    batch = BatchProcessor(converter)
     
-    # Determinar archivo de salida
-    output_path = determine_output_path(input_path, args.output)
+    result = batch.process_directory(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        pattern=args.filter,
+        recursive=args.recursive
+    )
     
-    # Si la entrada es ODT, la salida también debe serlo
-    if is_odt and args.output is None:
-        output_path = output_path.with_suffix('.odt')
+    sys.exit(0 if result['success'] and result['files_processed'] > 0 else 1)
+
+
+def process_file(input_path: Path, args):
+    """Procesa un archivo individual."""
+    # Salida
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        output_path = input_path.parent / f"{input_path.stem}_convertido{input_path.suffix}"
     
     log_path = output_path.parent / f"{output_path.stem}.log.txt"
     
+    # Info
     if not args.quiet:
         print(f"Procesando: {input_path}")
-        if is_odt:
-            print(f"Formato detectado: ODT")
+        print(f"Formato detectado: {'ODT' if is_odt_file(input_path) else 'TXT'}")
         print(f"Salida: {output_path}")
-        print(f"Log: {log_path}")
-        print()
+        print(f"Log: {log_path}\n")
     
     try:
-        # Leer archivo de entrada
-        if not args.quiet:
-            print("Leyendo archivo de entrada...")
-        
-        if is_odt:
-            # Leer ODT
-            reader = ODTReader(input_path)
-            text = reader.extract_text()
-            if not args.quiet:
-                print(f"  Texto extraído: {len(text)} caracteres")
-        else:
-            # Leer TXT
-            text = input_path.read_text(encoding='utf-8')
-        
-        # Convertir
-        if not args.quiet:
-            print("Convirtiendo diálogos...")
-        
         converter = DialogConverter()
-        converted_text, logger = converter.convert(text)
         
-        # Guardar resultados
-        if not args.quiet:
-            print("Guardando archivos...")
-        
-        if is_odt or (args.output and Path(args.output).suffix.lower() == '.odt'):
-            # Guardar como ODT PRESERVANDO ESTRUCTURA
-            if is_odt:
-                # Usar el procesador que preserva estructura
-                processor = ODTProcessor(input_path)
-                converter_inst = DialogConverter()
-                processor.process_and_save(output_path, converter_inst.convert)
-                if not args.quiet:
-                    print(f"  Guardado como ODT (estructura preservada)")
-            else:
-                # Modo simple si la entrada no es ODT
-                writer = ODTWriter(output_path)
-                writer.write_text(converted_text)
-                if not args.quiet:
-                    print(f"  Guardado como ODT")
+        if is_odt_file(input_path):
+            # ODT
+            if not args.quiet:
+                print("Leyendo archivo de entrada...")
+            
+            processor = ODTProcessor(input_path)
+            processor.process_and_save(output_path, converter.convert)
+            log_content = converter.logger.generate_report()
+            
         else:
-            # Guardar como TXT
-            output_path.write_text(converted_text, encoding='utf-8')
+            # TXT
+            if not args.quiet:
+                print("Leyendo archivo de entrada...")
+            
+            with open(input_path, 'r', encoding='utf-8') as f:
+                input_text = f.read()
+            
+            if not args.quiet:
+                print(f"  Texto extraído: {len(input_text)} caracteres")
+                print("Convirtiendo diálogos...")
+            
+            converted_text, logger = converter.convert(input_text)
+            
+            if not args.quiet:
+                print("Guardando archivos...")
+            
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(converted_text)
+            
+            log_content = logger.generate_report()
         
-        logger.save_to_file(log_path)
+        # Log
+        with open(log_path, 'w', encoding='utf-8') as f:
+            f.write(log_content)
         
-        # Mostrar estadísticas
+        # Resumen
         if not args.quiet:
-            stats = logger.get_stats()
-            print()
-            print("✓ Conversión completada exitosamente")
-            print(f"  Total de cambios: {stats['total_changes']}")
-            print(f"  Reglas aplicadas: {len(stats['rules_applied'])}")
-            print()
-            print(f"Archivos generados:")
+            if is_odt_file(input_path):
+                print("  Guardado como ODT (estructura y formato preservados)")
+            
+            print("\n✓ Conversión completada exitosamente")
+            
+            changes = converter.logger.changes
+            rules_applied = set(c[3] for c in changes) if changes else set()
+            
+            print(f"  Total de cambios: {len(changes)}")
+            print(f"  Reglas aplicadas: {len(rules_applied)}\n")
+            print("Archivos generados:")
             print(f"  - {output_path}")
             print(f"  - {log_path}")
         
         sys.exit(0)
         
     except Exception as e:
-        print(f"Error durante la conversión: {e}", file=sys.stderr)
+        print(f"\n❌ Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
