@@ -67,7 +67,12 @@ Thumbs.db
 
 # Project specific
 *_convertido.txt
+*_convertido.odt
 *_convertido.log.txt
 *.log
+convertidos/
+
+# Streamlit
+.streamlit/
 
 examples

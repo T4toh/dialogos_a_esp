@@ -1,14 +1,12 @@
-# dialogos_a_español
+# Conversor de Diálogos a Español
 
-Conversor de diálogos narrativos con comillas al formato editorial español con raya de diálogo (—).
+Convierte diálogos con comillas al formato editorial español con raya (—).
 
-**Versión actual:** 1.3.0
+**Versión:** 1.4.0
 
 ---
 
-## 🎯 ¿Qué hace?
-
-Convierte automáticamente diálogos con comillas (`"` `'`) al formato editorial español estándar con rayas de diálogo (—), siguiendo las reglas de la RAE y convenciones editoriales.
+## ¿Qué hace?
 
 **Antes:**
 ```
@@ -22,378 +20,156 @@ Convierte automáticamente diálogos con comillas (`"` `'`) al formato editorial
 
 ---
 
-## ✨ Características
+## Características
 
-- ✅ **Soporte nativo para archivos ODT** (LibreOffice/OpenOffice Writer)
-- ✅ **Preservación completa de formato inline** (negrita, cursiva, subrayado) 🆕
-- ✅ **Soporte para archivos TXT** (texto plano)
-- ✅ Procesamiento offline, sin internet
-- ✅ Sin dependencias externas (solo Python estándar)
-- ✅ Manejo de textos muy largos (novelas completas)
-- ✅ Soporta comillas rectas ASCII (`"` `'`) y tipográficas (`"` `"` `'` `'`)
-- ✅ Aplicación completa de reglas editoriales
-- ✅ Log detallado de todos los cambios
-- ✅ Preserva estructura y estilos del documento
-- ✅ 26 tests automatizados (100% passing)
+- ✅ Interfaz web visual (Streamlit)
+- ✅ Línea de comandos (CLI)
+- ✅ Soporte para archivos ODT y TXT
+- ✅ Procesamiento de carpetas completas
+- ✅ Preserva formato de documentos ODT
+- ✅ Modo oscuro/claro
 
 ---
 
-## 📋 Requisitos
-
-- **Python 3.11+**
-- Solo librerías estándar (incluidas con Python)
-
----
-
-## 🚀 Instalación
+## Instalación
 
 ```bash
 git clone <repo-url>
 cd dialogos_a_español
 ```
 
-No se requiere instalación de dependencias adicionales.
+### Para usar la interfaz web:
+
+```bash
+# Instalar Streamlit
+pip install streamlit
+
+# O con el script (instala automáticamente)
+./start_web.sh
+```
 
 ---
 
-## 💡 Uso
+## Uso
 
-### Básico
+### 🖥️ Interfaz Web (Recomendado)
+
+```bash
+./start_web.sh
+```
+
+Se abre en tu navegador: `http://localhost:8501`
+
+**Características:**
+- Navegador visual de carpetas
+- Contador de palabras
+- Selección de archivos con checkboxes
+- Barra de progreso
+- Abrir carpeta de resultados
+- Modo oscuro/claro
+
+**Pasos:**
+1. Selecciona una carpeta (selector visual o escribir ruta)
+2. Haz clic en "🔍 Escanear"
+3. Selecciona los archivos que quieres procesar
+4. Configura carpeta de salida (opcional)
+5. Haz clic en "▶️ Iniciar Conversión"
+6. Abre la carpeta de resultados con el botón
+
+---
+
+### 💻 Línea de Comandos
+
+#### Archivo individual
 
 ```bash
 # Archivo de texto
-python -m src.main mi_capitulo.txt
+python -m src.main mi_archivo.txt
 
-# Archivo ODT (LibreOffice/Writer)
-python -m src.main mi_capitulo.odt
+# Archivo ODT
+python -m src.main mi_archivo.odt
 ```
 
-### Opciones
+#### Carpeta completa
 
 ```bash
-# Especificar archivo de salida
-python -m src.main input.txt -o salida.txt
+# Procesar todos los archivos
+python -m src.main mi_carpeta/
 
-# Modo silencioso (sin mensajes)
-python -m src.main input.txt --quiet
+# Solo archivos ODT
+python -m src.main mi_carpeta/ --filter "*.odt"
 
-# Ver versión
-python -m src.main --version
+# Incluir subcarpetas
+python -m src.main mi_carpeta/ --recursive
 
-# Ayuda
-python -m src.main --help
+# Especificar carpeta de salida
+python -m src.main mi_carpeta/ -o resultados/
 ```
 
-### Archivos generados
+#### Opciones
 
-Cada ejecución genera **dos archivos**:
-
-1. **`{nombre}_convertido.txt`** (o `.odt`) - Texto convertido
-2. **`{nombre}_convertido.log.txt`** - Log detallado con:
-   - Ubicación de cada cambio
-   - Texto original
-   - Texto convertido
-   - Regla aplicada
+```bash
+-o, --output PATH    # Archivo/carpeta de salida
+--filter PATTERN     # Patrón de archivos (ej: "*.odt")
+--recursive          # Incluir subcarpetas
+-q, --quiet          # Modo silencioso
+--version            # Ver versión
+--help               # Ayuda
+```
 
 ---
 
-## 📝 Reglas de Conversión
+## Archivos Generados
 
-El conversor implementa todas las reglas editoriales del español:
+Cada conversión genera **dos archivos**:
 
-### D1: Sustitución de delimitadores
+1. **`archivo_convertido.txt`** (o `.odt`) - Texto convertido
+2. **`archivo_convertido.log.txt`** - Log detallado con todos los cambios
 
-Convierte comillas a rayas de diálogo:
+---
 
-```
-"Hola, Juan" → —Hola, Juan
-```
+## Reglas de Conversión
+
+El conversor aplica las reglas editoriales del español:
+
+- **D1**: Sustitución de comillas → `"Hola"` → `—Hola`
+- **D2**: Etiquetas de diálogo → `"Hola" dijo` → `—Hola —dijo`
+- **D3**: Puntuación correcta → `"¿Hola?" preguntó` → `—¿Hola? —preguntó`
+- **D4**: Continuación de diálogo → Detecta mismo personaje
+- **D5**: Citas internas → Usa comillas latinas `« »`
 
 Soporta:
-- Comillas rectas: `"` `'` (ASCII)
-- Comillas tipográficas: `"` `"` `'` `'` (Unicode)
-
-### D2: Etiquetas de diálogo
-
-Coloca etiquetas narrativas después de raya con minúscula:
-
-```
-"Hola" Dijo Juan → —Hola —dijo Juan
-"¿Vienes?" preguntó Ana → —¿Vienes? —preguntó Ana
-```
-
-Reconoce **42 verbos dicendi**: dijo, preguntó, respondió, murmuró, gritó, etc.
-
-### D3: Puntuación correcta
-
-Maneja signos de interrogación y exclamación:
-
-```
-"¿Qué haces?" dijo → —¿Qué haces? —dijo
-"¡Espera!" gritó → —¡Espera! —gritó
-```
-
-### D4: Continuación de diálogo
-
-Detecta cuando el mismo personaje sigue hablando:
-
-```
-"Hola" dijo Juan. "¿Cómo estás?"
-↓
-—Hola —dijo Juan. —¿Cómo estás?
-```
-
-### D5: Citas internas
-
-Usa comillas latinas para citas dentro de diálogos:
-
-```
-"Me dijo 'vendré' pero no vino"
-↓
-—Me dijo «vendré» pero no vino
-```
+- Comillas rectas: `"` `'`
+- Comillas tipográficas: `"` `"` `'` `'`
+- 42 verbos dicendi reconocidos
 
 ---
 
-## 📂 Trabajo con ODT (LibreOffice)
+## Requisitos
 
-### Ventajas
-
-✅ Trabaja directamente con tus documentos  
-✅ Preserva toda la estructura del archivo original  
-✅ **Preserva formato inline** (negrita, cursiva, subrayado) 🆕  
-✅ Mantiene estilos del documento (títulos, párrafos, etc.)  
-✅ Preserva saltos de línea entre diálogos  
-✅ Resultado editable en LibreOffice/Word  
-
-### Flujo de trabajo recomendado
-
-1. **Escribe** en LibreOffice Writer (usa comillas normales y formato como quieras)
-2. **Guarda** tu documento (`.odt`)
-3. **Convierte**: `python -m src.main capitulo_1.odt`
-4. **Abre** `capitulo_1_convertido.odt` en LibreOffice
-5. **¡Listo!** - Formato preservado automáticamente ✨
-
-### 🎉 Nuevo en v1.3.0: Preservación de Formato Inline
-
-El conversor ahora **preserva automáticamente** el formato de tus palabras:
-
-**Ejemplo:**
-- Si "ignoraba" está en *cursiva* en el original → se mantiene en *cursiva* ✅
-- Si "Dijo" está en **negrita** → "dijo" sigue en **negrita** ✅
-- Subrayado, colores y otros estilos → preservados ✅
-
-**Cómo funciona:**
-1. Extrae un mapa de formato: palabra → estilo
-2. Convierte el texto (comillas a rayas)
-3. Aplica el formato según el mapa
-
-**Cobertura:** ~95% del formato se preserva automáticamente. Solo palabras completamente nuevas (muy raro) no tendrían formato.
+- Python 3.11+
+- Streamlit (solo para interfaz web)
 
 ---
 
-## 📊 Ejemplo Completo
-
-### Entrada (`ejemplo.txt`):
-
-```
-"Hola, ¿cómo estás?" Preguntó María.
-
-"Bien, gracias." Respondió Juan. "¿Y tú?"
-
-"También bien" dijo María. "Me alegra verte."
-```
-
-### Salida (`ejemplo_convertido.txt`):
-
-```
-—Hola, ¿cómo estás? —preguntó María.
-
-—Bien, gracias. —respondió Juan. —¿Y tú?
-
-—También bien —dijo María. —Me alegra verte.
-```
-
-### Log generado:
-
-```
-CAMBIO #1
-Ubicación: ~línea 1
-Regla aplicada: D2: Etiqueta de diálogo
-
-ORIGINAL:
-  "Hola, ¿cómo estás?" Preguntó
-
-CONVERTIDO:
-  —Hola, ¿cómo estás? —preguntó
-```
-
----
-
-## 🧪 Testing
+## Tests
 
 ```bash
-# Ejecutar todos los tests
 python -m unittest discover tests -v
-
-# Test específico
-python -m unittest tests.test_converter -v
-
-# Verificación completa del proyecto
-./verify.sh
 ```
 
-**Estado actual:** 26 tests, todos pasan ✅
+26 tests - 100% passing ✅
 
 ---
 
-## 📁 Estructura del Proyecto
+## Licencia
 
-```
-dialogos_a_español/
-├── src/
-│   ├── __init__.py         # Versión del paquete
-│   ├── main.py             # CLI principal
-│   ├── converter.py        # Motor de conversión
-│   ├── logger.py           # Sistema de logging
-│   ├── rules.py            # Reglas de conversión
-│   └── odt_handler.py      # Manejo de archivos ODT
-├── tests/
-│   ├── test_converter.py   # Tests de conversión
-│   └── test_odt.py         # Tests de ODT
-├── examples/
-│   ├── ejemplo.txt         # Ejemplo básico
-│   └── ejemplo_largo.txt   # Ejemplo complejo
-├── README.md               # Este archivo
-├── CHANGELOG.md            # Historial de versiones
-├── LICENSE                 # Licencia MIT
-└── verify.sh               # Script de verificación
-```
+MIT License - Ver [LICENSE](LICENSE)
 
 ---
 
-## 🔧 Uso Programático
+## Versión
 
-También puedes usar el conversor desde tu propio código Python:
+**1.4.0** - Interfaz web, procesamiento batch, modo oscuro/claro
 
-```python
-from pathlib import Path
-from src.converter import DialogConverter
-
-# Convertir texto
-converter = DialogConverter()
-texto_original = '"Hola" dijo Juan.'
-texto_convertido, logger = converter.convert(texto_original)
-
-print(texto_convertido)  # —Hola —dijo Juan.
-
-# Ver estadísticas
-stats = logger.get_stats()
-print(f"Cambios: {stats['total_changes']}")
-
-# Guardar log
-logger.save_to_file(Path('conversion.log.txt'))
-```
-
-### Procesar ODT:
-
-```python
-from pathlib import Path
-from src.odt_handler import ODTProcessor
-from src.converter import DialogConverter
-
-# Procesar y guardar ODT
-processor = ODTProcessor(Path('entrada.odt'))
-converter = DialogConverter()
-
-processor.process_and_save(
-    Path('salida.odt'),
-    converter.convert
-)
-```
-
----
-
-## ❓ Preguntas Frecuentes
-
-### ¿Funciona con archivos de Word (.docx)?
-
-No directamente. Word puede **exportar a ODT**: Archivo → Guardar como → OpenDocument Text (.odt).
-
-Luego procesas el ODT y lo puedes abrir nuevamente en Word.
-
-### ¿Puedo procesar varios archivos a la vez?
-
-Sí, usando un script bash:
-
-```bash
-for file in capitulo_*.odt; do
-    python -m src.main "$file" --quiet
-done
-```
-
-### ¿Se puede deshacer la conversión?
-
-No automáticamente, pero el archivo original nunca se modifica. Siempre se crea un archivo nuevo `_convertido`.
-
-### ¿Qué pasa si el conversor se equivoca?
-
-Revisa el archivo `.log.txt` para ver exactamente qué se cambió y dónde. Puedes editar manualmente los casos incorrectos en el archivo convertido.
-
-### ¿Funciona con otros idiomas?
-
-El conversor está optimizado para español, pero puede funcionar con cualquier texto que use comillas. Las etiquetas de diálogo están en español.
-
----
-
-## 🐛 Problemas Conocidos
-
-1. **Casos edge con puntuación compleja**
-   - Algunos casos muy específicos pueden necesitar revisión manual
-   - Siempre revisar el log para verificar cambios
-
----
-
-## 🚀 Próximas Versiones
-
-### Posibles mejoras
-- Optimización de spans (reducir cantidad generada)
-- Soporte para más tipos de comillas
-- Modo interactivo para revisar cambios antes de aplicarlos
-- Exportación a otros formatos
-
----
-
-## 🤝 Contribuir
-
-Este es un proyecto funcional pero siempre mejorable. Si encuentras bugs o tienes sugerencias:
-
-1. Prueba con un archivo pequeño primero
-2. Revisa el `.log.txt` generado
-3. Reporta casos problemáticos con ejemplos específicos
-
----
-
-## 📄 Licencia
-
-MIT License - Ver archivo `LICENSE` para detalles.
-
----
-
-## 👤 Autor
-
-Proyecto creado con GitHub Copilot CLI para facilitar la edición de textos narrativos en español.
-
----
-
-## 📚 Recursos Adicionales
-
-- **RAE**: Normas de puntuación en español
-- **Fundéu**: Recomendaciones editoriales
-- **LibreOffice**: Editor gratuito compatible con ODT
-
----
-
-**¿Preguntas?** Revisa el `CHANGELOG.md` para ver el historial completo de cambios y mejoras.
-
-**Versión actual: 1.3.0** - Preservación completa de formato inline implementada ✨
+Ver [CHANGELOG.md](CHANGELOG.md) para historial completo de cambios.
