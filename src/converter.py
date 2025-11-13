@@ -90,8 +90,9 @@ class DialogConverter:
             content = match.group(1)
             tag = match.group(2)
             
-            # Verificar puntuación al final del contenido
+            # Regla RAE: mantener puntuación del diálogo
             if content.endswith(('?', '!', '.')):
+                # Mantener la puntuación original
                 result = f'{self.EM_DASH}{content} {self.EM_DASH}{tag.lower()}'
             elif content.endswith(','):
                 # Quitar coma del final
@@ -125,8 +126,9 @@ class DialogConverter:
             
             # Verificar si la palabra es etiqueta de diálogo
             if is_dialog_tag(word):
-                # Es etiqueta de diálogo
-                if content.endswith(('.', '?', '!')):
+                # Regla RAE: mantener puntuación del diálogo
+                if content.endswith(('?', '!', '.')):
+                    # Mantener la puntuación original
                     result = f'{self.EM_DASH}{content} {self.EM_DASH}{word.lower()}'
                 elif content.endswith(','):
                     content_clean = content.rstrip(',').strip()
@@ -142,12 +144,12 @@ class DialogConverter:
                 )
                 return result
             else:
-                # No es etiqueta, es narración nueva
-                # No agregar punto si ya termina con puntuación
+                # No es etiqueta, es narración nueva (RAE 2.3.d)
+                # Según RAE: debe iniciarse con mayúscula y llevar raya de apertura
                 if content.endswith(('.', '?', '!', '…')):
-                    result = f'{self.EM_DASH}{content} {word}'
+                    result = f'{self.EM_DASH}{content} {self.EM_DASH}{word}'
                 else:
-                    result = f'{self.EM_DASH}{content}. {word}'
+                    result = f'{self.EM_DASH}{content}. {self.EM_DASH}{word}'
                 
                 self.logger.log_change(
                     self.current_line,
@@ -170,6 +172,7 @@ class DialogConverter:
             content = match.group(1)
             tag = match.group(2)
             
+            # Regla RAE: mantener puntuación del diálogo
             if content.endswith(('?', '!', '.')):
                 result = f'{self.EM_DASH}{content} {self.EM_DASH}{tag.lower()}'
             elif content.endswith(','):

@@ -26,6 +26,38 @@ class ConversionLogger:
         """
         self.changes.append((line_num, original, converted, rule))
     
+    def _truncate_text(self, text: str, max_length: int = 150) -> str:
+        """
+        Trunca texto largo mostrando solo el inicio relevante.
+        Para logs de conversión, lo importante es ver el CAMBIO, no todo el texto.
+        
+        Args:
+            text: Texto a truncar
+            max_length: Longitud máxima (aumentado a 150 para mayor contexto)
+            
+        Returns:
+            Texto truncado mostrando el inicio (donde están los cambios)
+        """
+        if len(text) <= max_length:
+            return text
+        
+        # Truncar mostrando el inicio (donde suelen estar los cambios)
+        # Intentar cortar en un espacio para no partir palabras
+        truncate_at = max_length
+        
+        # Buscar el último espacio antes del límite
+        last_space = text.rfind(' ', 0, max_length)
+        if last_space > max_length * 0.8:  # Si el espacio está cerca del final
+            truncate_at = last_space
+        
+        truncated = text[:truncate_at]
+        
+        # Agregar indicador de truncamiento
+        if truncate_at < len(text):
+            truncated = truncated + "..."
+                
+        return truncated
+    
     def generate_report(self) -> str:
         """
         Genera el reporte completo de cambios.
@@ -52,11 +84,15 @@ class ConversionLogger:
             buffer.write(f"Ubicación: ~línea {line_num}\n")
             buffer.write(f"Regla aplicada: {rule}\n\n")
             
+            # Truncar textos largos
+            original_display = self._truncate_text(original)
+            converted_display = self._truncate_text(converted)
+            
             buffer.write("ORIGINAL:\n")
-            buffer.write(f"  {original}\n\n")
+            buffer.write(f"  {original_display}\n\n")
             
             buffer.write("CONVERTIDO:\n")
-            buffer.write(f"  {converted}\n\n")
+            buffer.write(f"  {converted_display}\n\n")
             
             buffer.write("-" * 80 + "\n\n")
         

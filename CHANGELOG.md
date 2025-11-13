@@ -4,6 +4,171 @@ Historial de cambios del proyecto.
 
 ---
 
+## [1.5.2] - 2025-01-13
+
+### Eliminado
+
+- **Botón "Abrir Carpeta de Resultados" en interfaz web**
+  - Funcionalidad inconsistente entre sistemas operativos
+  - Reemplazado por mostrar la ruta de resultados directamente
+  - Los usuarios pueden copiar la ruta y abrirla manualmente
+
+---
+
+## [1.5.1] - 2025-01-13
+
+### Corregido
+
+- **Truncamiento de logs mejorado para coherencia**
+  - Problema: Original y convertido se truncaban en puntos diferentes
+  - Ejemplo: Original mostraba "...Técnica Arca..." pero convertido "...después de ..."
+  - Causa: Algoritmo usaba posición de comillas, que difiere entre `"` y `—`
+  - Solución: Truncamiento simple desde el inicio, cortando en espacio
+  - Límite aumentado a 150 caracteres (antes 100)
+  - Ahora ambos textos se truncan en el MISMO punto lógico
+
+### Mejorado
+
+- **Legibilidad de logs**
+  - Textos cortos (<150 chars) se muestran completos
+  - Textos largos se truncan en el último espacio antes de 150 chars
+  - No parte palabras en medio
+  - Original y convertido siempre alineados
+
+### Confirmado
+
+- **Formato inline (itálicas/negritas) SÍ se preserva en ODT**
+  - El problema reportado era SOLO en los logs
+  - El ODT convertido tiene "Técnica Arcana" completo con formato
+  - Los logs solo mostraban truncamiento confuso
+
+---
+
+## [1.5.0] - 2025-01-13
+
+### ⚠️ CORRECCIÓN CRÍTICA
+
+- **Line-breaks internos en ODT ahora se preservan correctamente**
+  - Bug crítico: Párrafos con `<text:line-break/>` se pegaban sin saltos de línea
+  - Antes: Todo el capítulo en 12 líneas pegadas
+  - Ahora: 386 líneas correctamente separadas
+  - Afectaba archivos ODT creados en LibreOffice con Shift+Enter
+  
+### Corregido
+
+- **ODTReader._get_paragraph_text() reescrito**
+  - Ahora es recursivo para procesar line-breaks dentro de spans
+  - Convierte `<text:line-break/>` a `\n` correctamente
+  - Preserva estructura de párrafos largos con saltos internos
+  
+### Impacto
+
+- **Antes (v1.4.4):**
+  ```
+  ...peinado.Técnica Arcana."Me contó...
+  ```
+  (Todo pegado, ilegible)
+
+- **Ahora (v1.5.0):**
+  ```
+  ...peinado.
+  —Buenos días, Adi. —dijo llena de energía.
+  Sus cabellos castaños...
+  ```
+  (Correctamente separado)
+
+### Tests
+
+- 27/27 tests pasando ✓
+- Probado con novela completa de ejemplo
+- Line-breaks preservados en lectura Y escritura
+
+---
+
+## [1.4.4] - 2025-01-13
+
+### Mejorado
+
+- **Logs de conversión con truncamiento inteligente**
+  - Textos largos ahora se truncan a ~100 caracteres
+  - Muestra el contexto relevante (inicio del diálogo) en lugar del medio
+  - Los logs son mucho más legibles para textos largos
+  - Ejemplo: Texto de 259 caracteres se muestra como `"Inicio del texto...`
+  - Mejora significativa en la usabilidad del archivo `.log.txt`
+
+### Técnico
+
+- `src/logger.py`: Nueva función `_truncate_text()` con lógica contextual
+- Detecta posición de comillas y centra el truncamiento alrededor de ellas
+- Máximo 100 caracteres por entrada de log (configurable)
+
+---
+
+## [1.4.3] - 2025-01-13
+
+### Añadido
+
+- **Soporte para narración compleja entre diálogos (RAE 2.3.d)**
+  - Ejemplo: `"Demo." El hombre agregó. "¿Y ahora?"` → `—Demo. —El hombre agregó. —¿Y ahora?`
+  - Ahora detecta correctamente narración sin verbo de lengua
+  - Agrega raya de apertura antes de narración con mayúscula
+  - Test específico agregado para caso complejo
+
+- **Link a reglas RAE en README**
+  - Referencia oficial: https://www.rae.es/dpd/raya
+  - Ejemplos según RAE en la documentación
+  - Explicación clara de cada regla implementada
+
+### Corregido
+
+- **Raya de apertura en narración sin verbo de lengua**
+  - Antes: `"Está bien." Cerró la puerta` → `—Está bien. Cerró la puerta` ❌
+  - Ahora: `"Está bien." Cerró la puerta` → `—Está bien. —Cerró la puerta` ✓
+  - Cumple con RAE 2.3.d
+
+### Tests
+
+- 27/27 tests pasando ✓
+- Nuevo test: `test_complex_narration_interruption`
+- Test actualizado: `test_dialog_followed_by_narration`
+
+---
+
+## [1.4.2] - 2025-01-13
+
+### Corregido
+
+- **Cumplimiento total de reglas RAE para puntuación en diálogos**
+  - `"Cortesía." dijo` ahora produce `—Cortesía. —dijo.` (mantiene el punto del diálogo)
+  - Antes quitaba incorrectamente el punto: `—Cortesía —dijo.` ❌
+  - Ahora sigue la norma RAE: mantener puntuación original del diálogo ✓
+  - Referencia: https://www.rae.es/dpd/raya
+  
+### Ejemplos RAE implementados
+
+- `"¡Qué le vamos a hacer!" exclamó` → `—¡Qué le vamos a hacer! —exclamó`
+- `"Espero que salga bien" dijo` → `—Espero que salga bien —dijo`
+- `"¿Qué hora es?" preguntó` → `—¿Qué hora es? —preguntó`
+- `"No lo sé." contestó` → `—No lo sé. —contestó`
+
+---
+
+## [1.4.1] - 2025-01-13
+
+### Corregido
+
+- **Pérdida de formato inline en archivos ODT**
+  - Negrita, cursiva, subrayado ahora se preservan en TODOS los párrafos
+  - Antes solo se preservaba en párrafos con line-breaks
+  - Usa mapeo de formato palabra por palabra para todos los casos
+  - Ejemplo: "Técnica Arcana" en itálicas se mantiene en itálicas
+
+### Técnico
+
+- `src/odt_handler.py`: `_convert_paragraphs_in_tree()` siempre usa mapeo de formato
+
+---
+
 ## [1.4.0] - 2025-01-13
 
 ### Añadido
@@ -118,4 +283,4 @@ Historial de cambios del proyecto.
 ---
 
 **Última actualización:** 2025-01-13  
-**Versión actual:** 1.4.0
+**Versión actual:** 1.5.2

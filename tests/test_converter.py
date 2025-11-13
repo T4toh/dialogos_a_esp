@@ -56,9 +56,9 @@ class TestDialogConverter(unittest.TestCase):
         self.assertEqual(result, expected)
     
     def test_dialog_followed_by_narration(self):
-        """Test: Diálogo seguido de narración."""
+        """Test: Diálogo seguido de narración (RAE 2.3.d)."""
         input_text = '"Está bien." Cerró la puerta.'
-        expected = '—Está bien. Cerró la puerta.'
+        expected = '—Está bien. —Cerró la puerta.'
         result, _ = self.converter.convert(input_text)
         self.assertEqual(result, expected)
     
@@ -128,6 +128,13 @@ class TestDialogConverter(unittest.TestCase):
         """Test: Continuación de diálogo del mismo personaje."""
         input_text = '"Hola" dijo Juan. "¿Cómo estás?"'
         expected = '—Hola —dijo Juan. —¿Cómo estás?'
+        result, _ = self.converter.convert(input_text)
+        self.assertEqual(result, expected)
+    
+    def test_complex_narration_interruption(self):
+        """Test: Diálogo interrumpido por narración compleja (RAE 2.3.d)."""
+        input_text = '"Es una demostración de capacidad, querida." El hombre agregó al instante. "¿Cómo es la educación en este lugar, director?"'
+        expected = '—Es una demostración de capacidad, querida. —El hombre agregó al instante. —¿Cómo es la educación en este lugar, director?'
         result, _ = self.converter.convert(input_text)
         self.assertEqual(result, expected)
     

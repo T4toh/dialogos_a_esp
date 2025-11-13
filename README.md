@@ -1,19 +1,21 @@
 # Conversor de Diálogos a Español
 
-Convierte diálogos con comillas al formato editorial español con raya (—).
+Como escritor, escribo mis manuscritos (los que están en español) de la manera más cómoda posible y después paso todo a formato estándar español. Suelo usar un prompt pulido para un LLM, pero el resultado usualmente termina plachando (palabras perdidas, cambio de diálogos, cambio de voces, 'vos' pasados a 'ti', etc.). Así que pensé que esto debería poder hacerse de manera programática, cosa que ya existe en internet, pero a mí me gusta invocar a Bender y hacer mi propio script con juego de azar y mujerzuelas. Con esto en mente, escribí (con Claudio) este script. Yo estoy cómodo con la consola, pero agregué un Streamlit muy básico que usa el script para hacer los trabajos de manera más visual. En el front tiene un par de defectos, pero hace su trabajo. Por ejemplo, el explorador de carpetas deja mucho que desear.
 
-**Versión:** 1.4.0
+**Versión:** 1.5.2
 
 ---
 
 ## ¿Qué hace?
 
 **Antes:**
+
 ```
 "Hola" dijo Juan. "¿Cómo estás?"
 ```
 
 **Después:**
+
 ```
 —Hola —dijo Juan. —¿Cómo estás?
 ```
@@ -38,7 +40,7 @@ git clone <repo-url>
 cd dialogos_a_español
 ```
 
-### Para usar la interfaz web:
+### Para usar la interfaz web
 
 ```bash
 # Instalar Streamlit
@@ -61,20 +63,21 @@ pip install streamlit
 Se abre en tu navegador: `http://localhost:8501`
 
 **Características:**
+
 - Navegador visual de carpetas
 - Contador de palabras
 - Selección de archivos con checkboxes
-- Barra de progreso
-- Abrir carpeta de resultados
+- Barra de progreso en tiempo real
 - Modo oscuro/claro
 
 **Pasos:**
+
 1. Selecciona una carpeta (selector visual o escribir ruta)
 2. Haz clic en "🔍 Escanear"
 3. Selecciona los archivos que quieres procesar
 4. Configura carpeta de salida (opcional)
 5. Haz clic en "▶️ Iniciar Conversión"
-6. Abre la carpeta de resultados con el botón
+6. Copia la ruta de resultados mostrada para abrirla
 
 ---
 
@@ -130,15 +133,26 @@ Cada conversión genera **dos archivos**:
 
 ## Reglas de Conversión
 
-El conversor aplica las reglas editoriales del español:
+El conversor aplica las reglas editoriales del español según la **Real Academia Española (RAE)**:
+
+**📖 Referencia oficial:** [RAE - Uso de la raya en diálogos](https://www.rae.es/dpd/raya)
+
+### Reglas implementadas:
 
 - **D1**: Sustitución de comillas → `"Hola"` → `—Hola`
 - **D2**: Etiquetas de diálogo → `"Hola" dijo` → `—Hola —dijo`
-- **D3**: Puntuación correcta → `"¿Hola?" preguntó` → `—¿Hola? —preguntó`
+- **D3**: Narración después de diálogo → `"Está bien." Cerró la puerta` → `—Está bien. —Cerró la puerta`
 - **D4**: Continuación de diálogo → Detecta mismo personaje
 - **D5**: Citas internas → Usa comillas latinas `« »`
 
-Soporta:
+### Ejemplos según RAE:
+
+- `"¡Qué le vamos a hacer!" exclamó` → `—¡Qué le vamos a hacer! —exclamó`
+- `"Cortesía." dijo` → `—Cortesía. —dijo`
+- `"Es una demo." El hombre agregó. "¿Y ahora?"` → `—Es una demo. —El hombre agregó. —¿Y ahora?`
+
+### Soporta:
+
 - Comillas rectas: `"` `'`
 - Comillas tipográficas: `"` `"` `'` `'`
 - 42 verbos dicendi reconocidos
@@ -170,6 +184,6 @@ MIT License - Ver [LICENSE](LICENSE)
 
 ## Versión
 
-**1.4.0** - Interfaz web, procesamiento batch, modo oscuro/claro
+**1.5.2** - Interfaz simplificada y formato ODT preservado
 
 Ver [CHANGELOG.md](CHANGELOG.md) para historial completo de cambios.

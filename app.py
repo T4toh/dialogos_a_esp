@@ -77,31 +77,6 @@ def format_size(size_bytes: int) -> str:
     return f"{size_bytes:.1f} TB"
 
 
-def open_folder(folder_path: Path):
-    """Abre carpeta en el explorador del sistema."""
-    try:
-        folder_path = folder_path.resolve()
-        
-        if sys.platform == 'win32':
-            # Windows
-            subprocess.Popen(['explorer', str(folder_path)])
-        elif sys.platform == 'darwin':
-            # macOS
-            subprocess.Popen(['open', str(folder_path)])
-        else:
-            # Linux - probar diferentes exploradores
-            for cmd in ['xdg-open', 'nautilus', 'dolphin', 'thunar', 'nemo']:
-                try:
-                    subprocess.Popen([cmd, str(folder_path)])
-                    break
-                except FileNotFoundError:
-                    continue
-        
-        return True
-    except Exception as e:
-        st.error(f"Error abriendo carpeta: {e}")
-        return False
-
 
 def list_directories(base_path: Path, max_depth: int = 2) -> List[str]:
     """Lista directorios disponibles desde un path base."""
@@ -782,15 +757,9 @@ def process_files(selected_files: set, output_dir: Path):
         for result in failed:
             st.text(f"✗ {result['file']} → {result.get('error', 'Error desconocido')}")
     
-    # Botón para abrir carpeta
+    # Mostrar ruta de salida
     st.markdown("---")
-    if st.button("📂 Abrir Carpeta de Salida", type="secondary", use_container_width=True):
-        if open_folder(output_dir):
-            st.success(f"✅ Abriendo carpeta en el explorador de archivos...")
-        else:
-            st.info(f"📁 Carpeta: {output_dir}")
-    
-    st.info(f"📁 Archivos guardados en: {output_dir}")
+    st.info(f"📁 **Archivos guardados en:** `{output_dir}`")
 
 
 if __name__ == '__main__':

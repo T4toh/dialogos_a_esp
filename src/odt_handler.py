@@ -69,15 +69,16 @@ class ODTProcessor:
         if tag in ('p', 'h'):
             # Verificar si tiene line-breaks internos
             if self._has_line_breaks(element):
-                # Procesar preservando line-breaks
+                # Procesar preservando line-breaks Y formato inline
                 self._convert_with_line_breaks(element, converter_func)
             else:
-                # Conversión simple
+                # Párrafo simple: preservar formato inline sin line-breaks
                 text = self._get_full_text(element)
                 if text.strip():
                     converted, _ = converter_func(text)
                     if converted != text:
-                        self._set_paragraph_text(element, converted)
+                        # Reconstruir preservando formato inline
+                        self._rebuild_simple_paragraph(element, text, converted)
         
         # Procesar hijos recursivamente
         for child in element:
@@ -108,6 +109,83 @@ class ODTProcessor:
         
         # Establecer nuevo texto
         element.text = new_text
+    
+    def _rebuild_simple_paragraph(self, element, original_text: str, converted_text: str):
+        """
+        Reconstruye un párrafo simple preservando formato inline.
+        
+        Args:
+            element: Elemento XML del párrafo
+            original_text: Texto original completo
+            converted_text: Texto convertido completo
+        """
+        import re
+        
+        # Extraer mapa de formato del original
+        format_map = self._extract_format_map(element)
+        
+        # Si no hay formato especial, usar método simple
+        if not format_map or all(not v for v in format_map.values()):
+            self._set_paragraph_text(element, converted_text)
+            return
+        
+        # Aplicar formato usando el mapa
+        ns_text = '{urn:oasis:names:tc:opendocument:xmlns:text:1.0}'
+        
+        def normalize_word(word: str) -> str:
+            """Normaliza palabra para matching."""
+            # Quitar puntuación incluyendo TODAS las comillas (ASCII + tipográficas)
+            cleaned = re.sub(r'[.,;:!?¿¡"\u2018\u2019\u201C\u201D\'—()\[\]{}]', '', word)
+            return cleaned.lower().strip()
+        
+        def get_word_style(word: str) -> str:
+            """Obtiene el estilo de una palabra desde el mapa."""
+            norm_word = normalize_word(word)
+            if norm_word in format_map and format_map[norm_word]:
+                return format_map[norm_word][0]['style']
+            return None
+        
+        # Guardar atributos
+        attribs = element.attrib.copy()
+        element.clear()
+        element.attrib.update(attribs)
+        
+        # Dividir en palabras preservando espacios
+        words = re.split(r'(\s+)', converted_text)
+        
+        # Reconstruir con formato
+        for i, word in enumerate(words):
+            if not word:
+                continue
+                
+            style_name = get_word_style(word) if not word.isspace() else None
+            
+            if i == 0:
+                # Primera palabra/espacio va en element.text
+                if style_name:
+                    span = ET.SubElement(element, f'{ns_text}span')
+                    span.set(f'{ns_text}style-name', style_name)
+                    span.text = word
+                else:
+                    element.text = word
+            else:
+                # Resto va en tails o spans
+                if style_name:
+                    span = ET.SubElement(element, f'{ns_text}span')
+                    span.set(f'{ns_text}style-name', style_name)
+                    span.text = word
+                else:
+                    # Agregar al tail del último elemento
+                    if len(element) > 0:
+                        if element[-1].tail:
+                            element[-1].tail += word
+                        else:
+                            element[-1].tail = word
+                    else:
+                        if element.text:
+                            element.text += word
+                        else:
+                            element.text = word
     
     def _has_line_breaks(self, element) -> bool:
         """Verifica si un párrafo tiene saltos de línea internos."""
@@ -197,8 +275,9 @@ class ODTProcessor:
         def normalize_word(word: str) -> str:
             """Normaliza palabra para matching (lowercase, sin puntuación)."""
             import re
-            # Quitar puntuación pero mantener contenido
-            cleaned = re.sub(r'[.,;:!?¿¡"\'"''"—\(\)\[\]{}]', '', word)
+            # Quitar puntuación incluyendo TODAS las comillas (ASCII + tipográficas)
+            # U+0022: " | U+0027: ' | U+2018: ' | U+2019: ' | U+201C: " | U+201D: "
+            cleaned = re.sub(r'[.,;:!?¿¡"\u2018\u2019\u201C\u201D\'—()\[\]{}]', '', word)
             return cleaned.lower().strip()
         
         def extract_words_with_format(elem, current_style=None):
@@ -257,7 +336,8 @@ class ODTProcessor:
         
         def normalize_word(word: str) -> str:
             """Normaliza palabra para matching."""
-            cleaned = re.sub(r'[.,;:!?¿¡"\'"''"—()\[\]{}]', '', word)
+            # Quitar puntuación incluyendo TODAS las comillas (ASCII + tipográficas)
+            cleaned = re.sub(r'[.,;:!?¿¡"\u2018\u2019\u201C\u201D\'—()\[\]{}]', '', word)
             return cleaned.lower().strip()
         
         def get_word_style(word: str) -> str:
@@ -525,27 +605,40 @@ class ODTReader:
     def _get_paragraph_text(self, element) -> str:
         """
         Obtiene el texto de un párrafo, incluyendo spans y otros elementos inline.
+        PRESERVA line-breaks internos como saltos de línea (recursivamente).
         
         Args:
             element: Elemento de párrafo
             
         Returns:
-            Texto del párrafo
+            Texto del párrafo con line-breaks convertidos a \n
         """
-        text_parts = []
+        def extract_text_recursive(elem):
+            """Extrae texto recursivamente preservando line-breaks."""
+            parts = []
+            
+            # Texto directo del elemento
+            if elem.text:
+                parts.append(elem.text)
+            
+            # Procesar hijos
+            for child in elem:
+                child_tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+                
+                # Si es line-break, agregar salto de línea
+                if child_tag == 'line-break':
+                    parts.append('\n')
+                else:
+                    # Recursivo para procesar spans que pueden contener line-breaks
+                    parts.extend(extract_text_recursive(child))
+                
+                # Texto después del elemento (tail)
+                if child.tail:
+                    parts.append(child.tail)
+            
+            return parts
         
-        # Texto directo del elemento
-        if element.text:
-            text_parts.append(element.text)
-        
-        # Procesar elementos hijos (spans, etc)
-        for child in element:
-            if child.text:
-                text_parts.append(child.text)
-            if child.tail:
-                text_parts.append(child.tail)
-        
-        return ''.join(text_parts)
+        return ''.join(extract_text_recursive(element))
 
 
 class ODTWriter:
