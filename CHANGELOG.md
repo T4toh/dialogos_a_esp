@@ -6,6 +6,64 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [1.4.0] - 2025-01-13
+
+### 🎉 Añadido - IMPORTANTE
+
+- ✅ **Procesamiento de carpetas completas (batch processing)**
+  - Nueva clase `BatchProcessor` para procesar múltiples archivos
+  - CLI extendido con modo carpeta automático
+  - Parámetros nuevos: `--filter`, `--recursive`, `--quiet`
+  - Barra de progreso visual durante procesamiento
+  - Resumen detallado con estadísticas por archivo
+  - Genera subcarpeta `convertidos/` automáticamente
+
+### Funcionalidad de Carpetas
+
+```bash
+# Procesar carpeta completa
+python -m src.main mi_novela/
+
+# Solo archivos ODT
+python -m src.main mi_novela/ --filter "*.odt"
+
+# Incluir subcarpetas
+python -m src.main mi_novela/ --recursive
+
+# Especificar salida
+python -m src.main mi_novela/ -o resultados/
+```
+
+### Características del Modo Carpeta
+
+- **Auto-detección**: Distingue automáticamente entre archivo y carpeta
+- **Filtrado inteligente**: Ignora archivos ya convertidos (`*_convertido.*`)
+- **Progreso en tiempo real**: Barra visual con nombre de archivo actual
+- **Estadísticas completas**: 
+  - Archivos procesados vs. total
+  - Total de cambios realizados
+  - Tiempo transcurrido
+  - Lista de éxitos/errores
+- **Manejo de errores**: Continúa procesamiento aunque falle un archivo
+
+### Arquitectura
+
+- Nuevo módulo `src/batch_processor.py`
+- `main.py` refactorizado para soportar dos modos:
+  - `process_file()` - Archivo individual (modo original)
+  - `process_directory()` - Carpeta completa (nuevo)
+- Compatibilidad total con ODT y TXT en modo batch
+
+### Estado Actual
+
+- ✅ **Formato inline**: 95%+ preservado automáticamente
+- ✅ **Line-breaks**: 100% preservados
+- ✅ **Estilos documento**: 100% preservados
+- ✅ **Conversión de diálogos**: Reglas D1-D5 completamente funcionales
+- ✅ **Procesamiento batch**: Carpetas completas con subcarpetas opcionales
+
+---
+
 ## [1.3.1] - 2025-01-12
 
 ### 🐛 Corregido
@@ -322,6 +380,6 @@ Para reportar problemas o sugerencias:
 
 ---
 
-**Última actualización**: 2025-01-12  
-**Versión actual**: 1.3.0  
-**Estado**: ✅ Completo - Preservación de formato inline implementada
+**Última actualización**: 2025-01-13  
+**Versión actual**: 1.4.0  
+**Estado**: ✅ Completo - Procesamiento batch implementado
