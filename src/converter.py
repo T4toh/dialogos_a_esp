@@ -58,6 +58,9 @@ class DialogConverter:
 
         original_line = line
 
+        # PASO 0: Normalizar puntuación incorrecta antes de verbos de dicción
+        line = self._fix_punctuation_before_dialog_tag(line)
+
         # Aplicar conversiones en orden de prioridad
         # Repetir hasta que no haya más comillas (para líneas con múltiples diálogos)
         max_iterations = 10  # Evitar loops infinitos
@@ -72,6 +75,42 @@ class DialogConverter:
                 break
 
         return line
+
+    def _fix_punctuation_before_dialog_tag(self, line: str) -> str:
+        """
+        Corrige puntuación incorrecta antes de verbos de dicción.
+
+        Según RAE: "texto", verbo (NO "texto." verbo)
+
+        Args:
+            line: Línea original
+
+        Returns:
+            Línea con puntuación corregida
+        """
+        # Patrón: "texto." verbo o "texto." verbo
+        pattern = re.compile(
+            r'(["\u201C\u201D])([^"\u201C\u201D]+)(\.)\s*(["\u201C\u201D])\s+('
+            + "|".join(DIALOG_TAGS)
+            + r")\b",
+            re.IGNORECASE,
+        )
+
+        def replace_punct(match):
+            open_quote = match.group(1)
+            content = match.group(2).strip()
+            close_quote = match.group(4)
+            verb = match.group(5)
+
+            # Verificar si el contenido termina en signos fuertes
+            if content.endswith(("?", "!", "…")):
+                # No cambiar: los signos fuertes son correctos
+                return match.group(0)
+
+            # Cambiar punto por coma
+            return f'{open_quote}{content},{close_quote} {verb}'
+
+        return pattern.sub(replace_punct, line)
 
     def _convert_dialog_with_tag(self, line: str, original: str) -> str:
         """

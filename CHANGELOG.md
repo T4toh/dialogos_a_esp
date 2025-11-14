@@ -4,6 +4,40 @@ Historial de cambios del proyecto.
 
 ---
 
+## [1.6.0] - 2025-01-14
+
+### Agregado
+- **REGLAS_RAE.md**: Documentación completa de reglas RAE para diálogos con raya
+  - 5 reglas principales (D1-D5) explicadas en detalle con ejemplos
+  - 42 verbos de dicción listados y categorizados
+  - Ejemplos correctos e incorrectos de puntuación según RAE
+  - Estado de implementación actual de cada regla
+- **MEJORAS_DIALOGOS.md**: Lista de mejoras pendientes para el parser
+
+### Corregido
+- **Puntuación antes de verbos de dicción**: Corrección automática según RAE
+  - Detecta y corrige: `"texto." verbo` → `"texto", verbo`
+  - Ejemplo: `"Buenos días, Adi." dijo` → `—Buenos días, Adi —dijo` (sin punto antes de raya)
+  - Regla RAE: usar coma (no punto) antes de cerrar comillas si sigue verbo de dicción
+  - No afecta signos fuertes (¿?¡!) que son correctos según RAE
+- **Bug crítico en batch processing**: Logs acumulados entre archivos
+  - Cada archivo ahora crea su propio `DialogConverter()` independiente
+  - Anteriormente el logger acumulaba cambios de todos los archivos procesados
+  - Logs en interfaz web ahora muestran contenido correcto por archivo
+
+### Cambiado
+- **Limpieza general del código** (pasó linting ruff):
+  - Type hints: Agregado `Optional[str]` donde funciones retornan `None`
+  - Excepciones: `except:` → `except Exception:` (no bare except)
+  - Imports: Eliminados duplicados (3x `re` en odt_handler) y no usados
+  - Variables: Removidas asignaciones sin uso (`container_key`, etc.)
+  - Whitespace: 127 líneas limpiadas automáticamente
+- **Documentación mejorada**:
+  - `.github/copilot-instructions.md`: Sección "Code Quality Standards" con reglas de linting
+  - README.md: Info del visualizador de logs y estadísticas integrados
+
+---
+
 ## [1.5.2] - 2025-01-13
 
 ### Eliminado
