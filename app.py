@@ -26,6 +26,98 @@ st.set_page_config(
 )
 
 
+def format_log_for_display(log_content: str, show_full: bool, max_changes: int = None, total_changes: int = 0) -> str:
+    """Formatea el log para mejor visualización en markdown."""
+    lines = log_content.split('\n')
+    formatted = []
+    changes_shown = 0
+    current_change = []
+    in_change = False
+    
+    for line in lines:
+        # Detectar inicio de cambio
+        if line.startswith("CAMBIO #"):
+            if current_change and (show_full or changes_shown < max_changes):
+                # Renderizar cambio anterior
+                formatted.append(format_single_change(current_change))
+                changes_shown += 1
+            current_change = [line]
+            in_change = True
+            
+            # Si alcanzamos el límite, detenemos
+            if not show_full and max_changes and changes_shown >= max_changes:
+                break
+        elif in_change:
+            current_change.append(line)
+    
+    # Agregar último cambio
+    if current_change and (show_full or changes_shown < max_changes):
+        formatted.append(format_single_change(current_change))
+        changes_shown += 1
+    
+    # Agregar mensaje si está truncado
+    if not show_full and max_changes and changes_shown < total_changes:
+        formatted.append(f"\n---\n\n💡 **Mostrando {changes_shown} de {total_changes} cambios**. Marca *'Mostrar log completo'* para ver todos.\n")
+    
+    return '\n'.join(formatted)
+
+
+def format_single_change(change_lines: List[str]) -> str:
+    """Formatea un cambio individual como tarjeta."""
+    if not change_lines:
+        return ""
+    
+    # Extraer información
+    header = change_lines[0]  # CAMBIO #N
+    location = ""
+    rule = ""
+    original = []
+    converted = []
+    
+    section = None
+    for line in change_lines[1:]:
+        line_stripped = line.strip()
+        if not line_stripped or line_stripped.startswith("-" * 10):  # Ignorar separadores
+            continue
+        
+        # Detectar línea
+        if line_stripped.startswith("Línea"):
+            location = line_stripped.replace("Línea:", "").replace("Línea", "").strip()
+        # Detectar regla
+        elif line_stripped.startswith("Regla:"):
+            rule = line_stripped.replace("Regla:", "").strip()
+        # Detectar sección original (mayúsculas o minúsculas)
+        elif line_stripped.upper().startswith("ORIGINAL:"):
+            section = "original"
+        # Detectar sección convertido (mayúsculas o minúsculas)
+        elif line_stripped.upper().startswith("CONVERTIDO:"):
+            section = "converted"
+        # Agregar contenido a la sección actual
+        elif section == "original":
+            original.append(line_stripped)
+        elif section == "converted":
+            converted.append(line_stripped)
+    
+    # Construir markdown como tarjeta
+    md = f"<div style='border: 1px solid #444; border-radius: 8px; padding: 16px; margin: 12px 0; background-color: rgba(28, 131, 225, 0.05);'>\n\n"
+    md += f"**{header}** | Línea {location}\n\n"
+    md += f"*{rule}*\n\n"
+    
+    # Mostrar original y convertido sin truncar
+    original_text = ' '.join(original) if original else 'N/A'
+    converted_text = ' '.join(converted) if converted else 'N/A'
+    
+    md += "<table style='width: 100%; border-collapse: collapse;'>\n"
+    md += "<tr>\n"
+    md += f"<td style='width: 50%; padding: 8px; vertical-align: top;'><strong>Original:</strong><br/><code>{original_text}</code></td>\n"
+    md += f"<td style='width: 50%; padding: 8px; vertical-align: top;'><strong>Convertido:</strong><br/><code>{converted_text}</code></td>\n"
+    md += "</tr>\n"
+    md += "</table>\n\n"
+    md += "</div>\n\n"
+    
+    return md
+
+
 def count_words_in_file(file_path: Path) -> int:
     """Cuenta palabras en un archivo."""
     try:
@@ -612,7 +704,7 @@ def main():
             
             with col1:
                 is_selected = file_info['path'] in st.session_state.selected_files
-                if st.checkbox("", value=is_selected, key=f"check_{idx}", label_visibility="collapsed"):
+                if st.checkbox("Seleccionar", value=is_selected, key=f"check_{idx}", label_visibility="collapsed"):
                     st.session_state.selected_files.add(file_info['path'])
                 else:
                     st.session_state.selected_files.discard(file_info['path'])
@@ -654,8 +746,12 @@ def main():
         else:
             st.warning("⚠️ Selecciona al menos un archivo para procesar")
     
-    else:
-        # Mensaje inicial
+    # Mostrar resultados si existen en session_state
+    if 'processing_results' in st.session_state and st.session_state['processing_results']:
+        display_results(st.session_state['processing_results'], Path(st.session_state['output_directory']))
+    
+    elif 'files_info' not in st.session_state:
+        # Mensaje inicial solo si no hay archivos escaneados ni resultados
         st.info("👆 Selecciona una carpeta y haz clic en 'Escanear' para comenzar")
 
 
@@ -672,9 +768,6 @@ def process_files(selected_files: set, output_dir: Path):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    # Convertidor
-    converter = DialogConverter()
-    
     # Resultados
     results = []
     total_files = len(selected_files)
@@ -686,6 +779,9 @@ def process_files(selected_files: set, output_dir: Path):
         status_text.text(f"Procesando {idx}/{total_files}: {file_path.name}")
         
         try:
+            # CREAR NUEVO CONVERTIDOR POR CADA ARCHIVO
+            converter = DialogConverter()
+            
             # Determinar archivo de salida
             output_file = output_dir / f"{file_path.stem}_convertido{file_path.suffix}"
             
@@ -715,7 +811,8 @@ def process_files(selected_files: set, output_dir: Path):
                 'file': file_path.name,
                 'success': True,
                 'changes': len(converter.logger.changes),
-                'output': output_file
+                'output': output_file,
+                'log_file': log_file
             })
             
         except Exception as e:
@@ -729,7 +826,15 @@ def process_files(selected_files: set, output_dir: Path):
     progress_bar.progress(1.0)
     status_text.text("✅ Procesamiento completado")
     
-    # Mostrar resultados
+    # Guardar resultados en session_state para persistencia
+    st.session_state['processing_results'] = results
+    st.session_state['output_directory'] = str(output_dir)
+    
+    # Los resultados se mostrarán automáticamente en el re-run
+
+
+def display_results(results: List[Dict], output_dir: Path):
+    """Muestra los resultados del procesamiento."""
     st.markdown("---")
     st.subheader("📊 Resultados")
     
@@ -760,6 +865,138 @@ def process_files(selected_files: set, output_dir: Path):
     # Mostrar ruta de salida
     st.markdown("---")
     st.info(f"📁 **Archivos guardados en:** `{output_dir}`")
+    
+    # Visor de logs
+    if successful:
+        st.markdown("---")
+        st.header("📄 Explorador de Cambios")
+        st.markdown("Revisa los cambios realizados en cada archivo")
+        
+        # Iterar sobre todos los archivos procesados (ordenados alfabéticamente)
+        sorted_results = sorted(successful, key=lambda x: x['file'])
+        
+        for idx, result in enumerate(sorted_results):
+            # Usar hash del log_file como key única
+            file_key = str(result.get('log_file', idx))
+            
+            with st.expander(f"📄 {result['file']} ({result['changes']} cambios)", expanded=(idx == 0)):
+                # Contenedor con key única para evitar caché de Streamlit
+                container_key = f"log_container_{hash(file_key)}"
+                
+                # Usar el log_file que se guardó durante el procesamiento
+                log_file = result.get('log_file')
+                
+                if log_file and Path(log_file).exists():
+                    # Leer contenido del log
+                    current_log_content = Path(log_file).read_text(encoding='utf-8')
+                    
+                    # Opciones de visualización (keys únicas por archivo)
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        show_full = st.checkbox("Mostrar todos", value=False, key=f"full_{file_key}")
+                    with col2:
+                        max_changes = st.number_input(
+                            "Cambios a mostrar", 
+                            min_value=5, 
+                            max_value=500, 
+                            value=50,
+                            step=5,
+                            disabled=show_full,
+                            key=f"max_{file_key}"
+                        )
+                    with col3:
+                        st.download_button(
+                            label="Descargar log",
+                            data=current_log_content,
+                            file_name=Path(log_file).name,
+                            mime="text/plain",
+                            use_container_width=True,
+                            key=f"download_{file_key}"
+                        )
+                    
+                    # Parsear cambios del log (scope local para este archivo)
+                    def parse_and_display_log(log_text, show_all, max_to_show):
+                        """Parse y muestra cambios - función local para aislar scope."""
+                        all_changes_local = []
+                        current_change_local = None
+                        
+                        for line in log_text.split('\n'):
+                            if line.startswith("CAMBIO #"):
+                                if current_change_local:
+                                    all_changes_local.append(current_change_local)
+                                current_change_local = {
+                                    'numero': line.strip(),
+                                    'ubicacion': '',
+                                    'regla': '',
+                                    'original': [],
+                                    'convertido': [],
+                                    'section': None
+                                }
+                            elif current_change_local:
+                                line_stripped = line.strip()
+                                if line_stripped.startswith("Línea:"):
+                                    current_change_local['ubicacion'] = line_stripped.replace("Línea:", "").strip()
+                                elif line_stripped.startswith("Regla:"):
+                                    current_change_local['regla'] = line_stripped.replace("Regla:", "").strip()
+                                elif line_stripped == "ORIGINAL:":
+                                    current_change_local['section'] = 'original'
+                                elif line_stripped == "CONVERTIDO:":
+                                    current_change_local['section'] = 'convertido'
+                                elif line.startswith("---"):
+                                    continue
+                                elif current_change_local['section'] == 'original' and line_stripped:
+                                    current_change_local['original'].append(line_stripped)
+                                elif current_change_local['section'] == 'convertido' and line_stripped:
+                                    current_change_local['convertido'].append(line_stripped)
+                        
+                        if current_change_local:
+                            all_changes_local.append(current_change_local)
+                        
+                        # Mostrar cambios
+                        changes_to_show_local = all_changes_local if show_all else all_changes_local[:max_to_show]
+                        st.markdown(f"**Mostrando {len(changes_to_show_local)} de {len(all_changes_local)} cambios**")
+                        
+                        for change in changes_to_show_local:
+                            with st.container():
+                                orig_text = ' '.join(change['original']) if change['original'] else 'N/A'
+                                conv_text = ' '.join(change['convertido']) if change['convertido'] else 'N/A'
+                                
+                                st.markdown(f"**{change['numero']}**")
+                                st.markdown(f"*Línea {change['ubicacion']} • {change['regla']}*")
+                                st.markdown("**Original:**")
+                                st.code(orig_text, language=None)
+                                st.markdown("**Convertido:**")
+                                st.code(conv_text, language=None)
+                                st.markdown("---")
+                        
+                        return len(all_changes_local)
+                    
+                    # Llamar a la función
+                    total_changes_in_file = parse_and_display_log(current_log_content, show_full, max_changes)
+                    
+                    # Estadísticas de reglas
+                    rules_count = {}
+                    for line in current_log_content.split('\n'):
+                        if 'Regla aplicada:' in line or 'Regla:' in line:
+                            rule = line.replace("Regla:", "").replace("Regla aplicada:", "").strip()
+                            rules_count[rule] = rules_count.get(rule, 0) + 1
+                    
+                    if rules_count:
+                        st.markdown("### Estadísticas")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown("**Reglas más aplicadas:**")
+                            sorted_rules = sorted(rules_count.items(), key=lambda x: x[1], reverse=True)
+                            for rule, count in sorted_rules[:5]:
+                                st.text(f"{rule}: {count} veces")
+                        
+                        with col2:
+                            st.markdown("**Distribución:**")
+                            for rule, count in sorted_rules[:5]:
+                                percentage = (count / result['changes']) * 100
+                                st.progress(percentage / 100, text=f"{rule}: {percentage:.1f}%")
+                else:
+                    st.warning("⚠️ No se encontró el archivo de log")
 
 
 if __name__ == '__main__':

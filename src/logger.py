@@ -26,37 +26,18 @@ class ConversionLogger:
         """
         self.changes.append((line_num, original, converted, rule))
     
-    def _truncate_text(self, text: str, max_length: int = 150) -> str:
+    def _format_text(self, text: str) -> str:
         """
-        Trunca texto largo mostrando solo el inicio relevante.
-        Para logs de conversión, lo importante es ver el CAMBIO, no todo el texto.
+        Formatea texto para el log sin truncar.
         
         Args:
-            text: Texto a truncar
-            max_length: Longitud máxima (aumentado a 150 para mayor contexto)
+            text: Texto a formatear
             
         Returns:
-            Texto truncado mostrando el inicio (donde están los cambios)
+            Texto formateado
         """
-        if len(text) <= max_length:
-            return text
-        
-        # Truncar mostrando el inicio (donde suelen estar los cambios)
-        # Intentar cortar en un espacio para no partir palabras
-        truncate_at = max_length
-        
-        # Buscar el último espacio antes del límite
-        last_space = text.rfind(' ', 0, max_length)
-        if last_space > max_length * 0.8:  # Si el espacio está cerca del final
-            truncate_at = last_space
-        
-        truncated = text[:truncate_at]
-        
-        # Agregar indicador de truncamiento
-        if truncate_at < len(text):
-            truncated = truncated + "..."
-                
-        return truncated
+        # Solo limpiar espacios extras pero mantener contenido completo
+        return ' '.join(text.split())
     
     def generate_report(self) -> str:
         """
@@ -67,7 +48,6 @@ class ConversionLogger:
         """
         buffer = io.StringIO()
         
-        buffer.write("=" * 80 + "\n")
         buffer.write("LOG DE CONVERSIÓN DE DIÁLOGOS A FORMATO ESPAÑOL\n")
         buffer.write("=" * 80 + "\n\n")
         
@@ -77,16 +57,14 @@ class ConversionLogger:
             buffer.write("No se realizaron cambios.\n")
             return buffer.getvalue()
         
-        buffer.write("-" * 80 + "\n\n")
-        
         for idx, (line_num, original, converted, rule) in enumerate(self.changes, 1):
             buffer.write(f"CAMBIO #{idx}\n")
-            buffer.write(f"Ubicación: ~línea {line_num}\n")
-            buffer.write(f"Regla aplicada: {rule}\n\n")
+            buffer.write(f"Línea: ~{line_num}\n")
+            buffer.write(f"Regla: {rule}\n\n")
             
-            # Truncar textos largos
-            original_display = self._truncate_text(original)
-            converted_display = self._truncate_text(converted)
+            # Formatear sin truncar
+            original_display = self._format_text(original)
+            converted_display = self._format_text(converted)
             
             buffer.write("ORIGINAL:\n")
             buffer.write(f"  {original_display}\n\n")
