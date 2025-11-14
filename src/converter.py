@@ -18,6 +18,9 @@ class DialogConverter:
     # Comillas a detectar (rectas y tipográficas)
     QUOTES_PATTERN = r'["\u201C\u201D]'  # " y " "
     SINGLE_QUOTES_PATTERN = r"['\u2018\u2019]"  # ' y ' '
+    
+    # Comillas españolas (latinas)
+    LATIN_QUOTES = ('«', '»')
 
     def __init__(self):
         self.logger = ConversionLogger()
@@ -33,6 +36,9 @@ class DialogConverter:
         Returns:
             Tupla (texto_convertido, logger)
         """
+        # PASO 0: Normalizar comillas
+        text = self._normalize_quotes(text)
+        
         lines = text.split("\n")
         converted_lines = []
 
@@ -42,6 +48,32 @@ class DialogConverter:
             converted_lines.append(converted_line)
 
         return "\n".join(converted_lines), self.logger
+
+    def _normalize_quotes(self, text: str) -> str:
+        """
+        Normaliza todos los tipos de comillas a un formato estándar.
+        
+        Convierte:
+        - Comillas españolas « » → " " (para detección consistente)
+        - Comillas tipográficas curvas " " → " "
+        - Comillas simples ' ' → '
+        
+        Args:
+            text: Texto original
+            
+        Returns:
+            Texto con comillas normalizadas
+        """
+        # Comillas españolas (latinas) → comillas rectas
+        text = text.replace('«', '"').replace('»', '"')
+        
+        # Comillas tipográficas inglesas → comillas rectas
+        text = text.replace('"', '"').replace('"', '"')
+        
+        # Comillas simples tipográficas → comillas simples rectas
+        text = text.replace(''', "'").replace(''', "'")
+        
+        return text
 
     def _convert_line(self, line: str) -> str:
         """
@@ -66,9 +98,11 @@ class DialogConverter:
         max_iterations = 10  # Evitar loops infinitos
         for _ in range(max_iterations):
             prev_line = line
-            line = self._convert_dialog_with_tag(line, original_line)
-            line = self._convert_standalone_dialog(line, original_line)
-            line = self._convert_nested_quotes(line, original_line)
+            line = self._convert_dialog_with_interruption(line, original_line)  # D3: Incisos con verbo
+            line = self._convert_dialog_with_narration(line, original_line)  # D4: Narración sin verbo
+            line = self._convert_dialog_with_tag(line, original_line)  # D2
+            line = self._convert_standalone_dialog(line, original_line)  # D1
+            line = self._convert_nested_quotes(line, original_line)  # D5
 
             # Si no cambió, ya terminamos
             if line == prev_line:
@@ -88,29 +122,157 @@ class DialogConverter:
         Returns:
             Línea con puntuación corregida
         """
-        # Patrón: "texto." verbo o "texto." verbo
+        # Patrón: "texto1." Verbo resto. "texto2"
+        # Detecta continuación del personaje con inciso del narrador
         pattern = re.compile(
-            r'(["\u201C\u201D])([^"\u201C\u201D]+)(\.)\s*(["\u201C\u201D])\s+('
-            + "|".join(DIALOG_TAGS)
-            + r")\b",
+            r'"([^"]+)\.\s*"\s+(' + "|".join(DIALOG_TAGS) + r')\b([^"]*?)\.\s+"([^"]+)"',
             re.IGNORECASE,
         )
 
         def replace_punct(match):
-            open_quote = match.group(1)
-            content = match.group(2).strip()
-            close_quote = match.group(4)
-            verb = match.group(5)
+            content1 = match.group(1).strip()
+            verb = match.group(2)
+            verb_rest = match.group(3).strip()
+            content2 = match.group(4).strip()
 
             # Verificar si el contenido termina en signos fuertes
-            if content.endswith(("?", "!", "…")):
+            if content1.endswith(("?", "!", "…")):
                 # No cambiar: los signos fuertes son correctos
                 return match.group(0)
 
-            # Cambiar punto por coma
-            return f'{open_quote}{content},{close_quote} {verb}'
+            # Cambiar a formato de inciso: "texto1", verbo resto. "texto2"
+            if verb_rest:
+                return f'"{content1}", {verb} {verb_rest}. "{content2}"'
+            else:
+                return f'"{content1}", {verb}. "{content2}"'
 
         return pattern.sub(replace_punct, line)
+
+    def _convert_dialog_with_interruption(self, line: str, original: str) -> str:
+        """
+        Convierte diálogos con inciso del narrador (D3).
+        
+        Ejemplo: "Lo principal", añadió, "es esto" → —Lo principal —añadió—, es esto
+        
+        Args:
+            line: Línea a convertir
+            original: Línea original para logging
+            
+        Returns:
+            Línea convertida
+        """
+        # Patrón 1: "texto1", verbo, "texto2" (con coma)
+        pattern1 = re.compile(
+            r'"([^"]+)",\s+(' + "|".join(DIALOG_TAGS) + r')\b([^,]*),\s+"([^"]+)"',
+            re.IGNORECASE
+        )
+        
+        def replace_interruption1(match):
+            text1 = match.group(1).strip()
+            verb = match.group(2).lower()
+            verb_rest = match.group(3).strip()
+            text2 = match.group(4).strip()
+            
+            # Estructura RAE: —texto1 —verbo resto—, texto2
+            if verb_rest:
+                result = f"{self.EM_DASH}{text1} {self.EM_DASH}{verb} {verb_rest}{self.EM_DASH}, {text2}"
+            else:
+                result = f"{self.EM_DASH}{text1} {self.EM_DASH}{verb}{self.EM_DASH}, {text2}"
+            
+            if original != line:
+                return result
+                
+            self.logger.log_change(
+                self.current_line,
+                match.group(0),
+                result,
+                "D3: Inciso del narrador con continuación"
+            )
+            return result
+        
+        line = pattern1.sub(replace_interruption1, line)
+        
+        # Patrón 2: "texto1", verbo resto. "texto2" (con punto)
+        pattern2 = re.compile(
+            r'"([^"]+)",\s+(' + "|".join(DIALOG_TAGS) + r')\b([^"]*?)\.\s+"([^"]+)"',
+            re.IGNORECASE
+        )
+        
+        def replace_interruption2(match):
+            text1 = match.group(1).strip()
+            verb = match.group(2).lower()
+            verb_rest = match.group(3).strip()
+            text2 = match.group(4).strip()
+            
+            # Estructura RAE: —texto1 —verbo resto—. texto2
+            if verb_rest:
+                result = f"{self.EM_DASH}{text1} {self.EM_DASH}{verb} {verb_rest}{self.EM_DASH}. {text2}"
+            else:
+                result = f"{self.EM_DASH}{text1} {self.EM_DASH}{verb}{self.EM_DASH}. {text2}"
+            
+            if original != line:
+                return result
+                
+            self.logger.log_change(
+                self.current_line,
+                match.group(0),
+                result,
+                "D3: Inciso del narrador con continuación (punto)"
+            )
+            return result
+        
+        return pattern2.sub(replace_interruption2, line)
+
+    def _convert_dialog_with_narration(self, line: str, original: str) -> str:
+        """
+        Convierte diálogos con narración intermedia (D4).
+        
+        RAE 2.3.b: "texto1." Narración (sin verbo). "texto2"
+        → —texto1. —Narración—. texto2
+        
+        Ejemplo: "Hola." Cerró la puerta. "Adiós." → —Hola. —Cerró la puerta—. Adiós.
+        
+        Args:
+            line: Línea a convertir
+            original: Línea original para logging
+            
+        Returns:
+            Línea convertida
+        """
+        # Patrón: "texto1." Palabra... "texto2"
+        # donde Palabra NO es verbo de dicción
+        pattern = re.compile(
+            r'"([^"]+)\.\s*"\s+([A-ZÁÉÍÓÚÑ][^"\.]+)\.\s+"([^"]+)"',
+            re.IGNORECASE
+        )
+        
+        def replace_narration(match):
+            text1 = match.group(1).strip()
+            narration = match.group(2).strip()
+            text2 = match.group(3).strip()
+            
+            # Verificar que NO haya verbo de dicción en la narración
+            words = narration.split()
+            for word in words:
+                if is_dialog_tag(word):
+                    # Hay verbo de dicción, no aplicar esta regla
+                    return match.group(0)
+            
+            # Estructura RAE: —texto1. —Narración—. texto2
+            result = f"{self.EM_DASH}{text1}. {self.EM_DASH}{narration}{self.EM_DASH}. {text2}"
+            
+            if original != line:
+                return result
+                
+            self.logger.log_change(
+                self.current_line,
+                match.group(0),
+                result,
+                "D4: Narración intermedia con continuación"
+            )
+            return result
+        
+        return pattern.sub(replace_narration, line)
 
     def _convert_dialog_with_tag(self, line: str, original: str) -> str:
         """

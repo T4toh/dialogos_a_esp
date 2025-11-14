@@ -213,19 +213,32 @@ Los signos fuertes reemplazan la coma/punto pero la estructura se mantiene.
 
 ### ✅ Implementado:
 - [x] D1: Sustitución básica de comillas
-- [x] D2: Etiquetas con verbos de dicción (básico)
+- [x] D2: Etiquetas con verbos de dicción
+  - [x] Corrección automática de puntuación (coma vs punto)
+- [x] D3: Incisos del narrador con continuación (CON verbo)
+  - [x] Con coma: `"texto1", verbo, "texto2"` → `—texto1 —verbo—, texto2`
+  - [x] Con punto: `"texto1", verbo. "texto2"` → `—texto1 —verbo—. texto2`
+- [x] D4: Narración intermedia con continuación (SIN verbo)
+  - [x] `"texto1." Narración. "texto2"` → `—texto1. —Narración—. texto2`
 - [x] D5: Comillas internas a latinas
-- [x] Reconocimiento de 42 verbos de dicción
+- [x] Reconocimiento de 44 verbos de dicción (agregado `agregó/agrega`)
+- [x] Normalización de comillas (« » " " ' ' → " ')
 
-### ⚠️ Parcialmente implementado:
-- [ ] D2: Manejo correcto de puntuación (coma vs punto)
-- [ ] D3: Incisos con continuación
-- [ ] D4: Narración después del diálogo
+### ⚠️ Nota importante:
+**Input correcto** según RAE para diálogos con continuación:
+```
+"Es normal", agregó sonriente. "Bastien ya debe estar esperándonos."
+```
+NO (punto antes de verbo):
+```
+"Es normal." Agregó sonriente. "Bastien ya debe estar esperándonos."
+```
+
+El conversor **autocorrige** puntos → comas cuando detecta verbo de dicción, pero funciona mejor con input ya correcto.
 
 ### ❌ Pendiente:
-- [ ] Normalización de todos los tipos de comillas
 - [ ] Detección de diálogos con etiqueta ANTES: `Juan dijo: "Hola"`
-- [ ] Múltiples diálogos en una línea
+- [ ] Múltiples diálogos en una línea (se procesa pero puede mejorar)
 - [ ] Validación de espaciado exacto
 
 ---

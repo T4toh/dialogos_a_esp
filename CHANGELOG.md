@@ -12,7 +12,15 @@ Historial de cambios del proyecto.
   - 42 verbos de dicción listados y categorizados
   - Ejemplos correctos e incorrectos de puntuación según RAE
   - Estado de implementación actual de cada regla
-- **MEJORAS_DIALOGOS.md**: Lista de mejoras pendientes para el parser
+- **D3 implementado**: Incisos del narrador con continuación
+  - Ejemplo: `"Lo principal", añadió Pilar, "es sentirse viva"` → `—Lo principal —añadió Pilar—, es sentirse viva`
+  - Soporta verbos de dicción con complementos (nombres, pronombres)
+  - Mantiene puntuación correcta antes y después del inciso
+- **Normalización de comillas**: Todos los tipos → formato estándar
+  - Comillas españolas `« »` → `" "`
+  - Comillas tipográficas `" "` → `" "`
+  - Comillas simples `' '` → `' '`
+  - Garantiza detección consistente de diálogos
 
 ### Corregido
 - **Puntuación antes de verbos de dicción**: Corrección automática según RAE
@@ -35,6 +43,9 @@ Historial de cambios del proyecto.
 - **Documentación mejorada**:
   - `.github/copilot-instructions.md`: Sección "Code Quality Standards" con reglas de linting
   - README.md: Info del visualizador de logs y estadísticas integrados
+
+### Removed
+- MEJORAS_DIALOGOS.md (contenido consolidado en REGLAS_RAE.md)
 
 ---
 

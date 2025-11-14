@@ -25,6 +25,8 @@ DIALOG_TAGS = [
     "exclama",
     "añadió",
     "añade",
+    "agregó",  # Sinónimo de añadió
+    "agrega",
     "continuó",
     "continúa",
     "repuso",
