@@ -208,34 +208,38 @@ Lista completa de verbos que activan la regla D2:
 
 #### Básicos
 
-- decir, dijo, dice
-- preguntar, preguntó, pregunta
-- responder, respondió, responde
-- exclamar, exclamó, exclama
-- gritar, gritó, grita
+- decir, dijo, dicen, dijeron
+- preguntar, preguntó, preguntan, preguntaron
+- responder, respondió, responden, respondieron
+- exclamar, exclamó, exclaman, exclamaron
+- gritar, gritó, gritan, gritaron
 
 #### De afirmación
 
-- afirmar, aseguró, confirmó, declaró, manifestó
+- afirmar, aseguró, afirman, aseguraron
+- declarar, declaró, declaran, declararon
+- manifestar, manifestó, manifiestan, manifestaron
 
 #### De sugerencia
 
-- añadir, agregó, continuar, prosiguió, siguió
+- añadir, agregó, añaden, agregaron
+- continuar, prosiguió, continúan, prosiguieron
 
 #### De actitud
 
-- murmurar, susurró, suspiró, balbuceó
-- insistir, replicó, objetó, protestó
+- murmurar, susurró, murmuran, susurraron
+- insistir, replicó, insisten, replicaron
 
 #### De intensidad
 
-- chillar, bramó, rugió, vociferó
+- chillar, bramó, chillan, bramaron
 
 #### De comunicación
 
-- comentar, observó, indicó, señaló, apuntó
-- advertir, reconoció, confesó, admitió
-- proponer, sugirió, ofreció
+- comentar, observó, comentan, observaron
+- indicar, indicó, indican, indicaron
+- advertir, reconoció, advierten, reconocieron
+- proponer, sugirió, proponen, sugirieron
 
 **Archivo:** `src/rules.py` - lista `DIALOG_TAGS`
 
