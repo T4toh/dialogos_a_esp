@@ -126,4 +126,37 @@ processor.process_and_save(Path('output.odt'), converter.convert)
 - **ODT = ZIP + XML**: Standard OpenDocument format, no external libraries
 - **Encoding**: Always UTF-8 for proper Spanish character support
 
+## Code Quality Standards
+
+### Type Hints
+- **Always use proper type hints** for function returns
+- Use `Optional[T]` when functions can return `None`
+- Example: `def get_style(word: str) -> Optional[str]:`
+- Import from `typing`: `Optional`, `List`, `Dict`, `Tuple`
+
+### Exception Handling
+- **Never use bare `except:`** - always specify exception type
+- Use `except Exception:` for broad catching
+- Use specific exceptions when possible: `except (ValueError, KeyError):`
+
+### Code Cleanliness
+- **No unused imports** - remove imports that aren't referenced
+- **No unused variables** - if assigned but never used, remove it
+- **No duplicate imports** - consolidate multiple imports from same module
+- Run `ruff check` before committing:
+  ```bash
+  python3 -m ruff check . --select E722,F,W --exclude tests
+  ```
+
+### Critical Patterns
+- **Create new converter instances per file** in batch processing to avoid log accumulation
+- **No f-strings without placeholders** - use regular strings instead
+- **Clean whitespace** - no trailing spaces on lines
+
+### Linting Workflow
+1. After changes, run: `python3 -m ruff check . --select E722,F --exclude tests`
+2. Auto-fix safe issues: `python3 -m ruff check . --select E722,F,W --exclude tests --fix`
+3. Verify tests: `python3 -m unittest discover tests -v`
+4. All 27 tests must pass ✅
+
 When modifying conversion logic, always test with `examples/ejemplo_largo.txt` (complex scenarios) and verify the generated `.log.txt` accurately captures all transformations.

@@ -24,12 +24,14 @@ Como escritor, escribo mis manuscritos (los que están en español) de la manera
 
 ## Características
 
-- ✅ Interfaz web visual (Streamlit)
+- ✅ Interfaz web visual con explorador de logs
 - ✅ Línea de comandos (CLI)
 - ✅ Soporte para archivos ODT y TXT
-- ✅ Procesamiento de carpetas completas
-- ✅ Preserva formato de documentos ODT
-- ✅ Modo oscuro/claro
+- ✅ Procesamiento por lotes de carpetas completas
+- ✅ Preserva formato de documentos ODT (estilos, metadatos)
+- ✅ Logs detallados con estadísticas
+- ✅ Modo oscuro/claro persistente
+- ✅ Sin dependencias externas (solo stdlib + Streamlit para web)
 
 ---
 
@@ -65,10 +67,13 @@ Se abre en tu navegador: `http://localhost:8501`
 **Características:**
 
 - Navegador visual de carpetas
-- Contador de palabras
-- Selección de archivos con checkboxes
+- Contador de palabras por archivo
+- Selección múltiple con checkboxes
 - Barra de progreso en tiempo real
-- Modo oscuro/claro
+- **📄 Visualizador de logs**: Explora todos los cambios realizados
+- **📊 Estadísticas**: Conteo de reglas aplicadas
+- Descarga logs individuales
+- Modo oscuro/claro persistente
 
 **Pasos:**
 
@@ -77,7 +82,8 @@ Se abre en tu navegador: `http://localhost:8501`
 3. Selecciona los archivos que quieres procesar
 4. Configura carpeta de salida (opcional)
 5. Haz clic en "▶️ Iniciar Conversión"
-6. Copia la ruta de resultados mostrada para abrirla
+6. **Explora los cambios**: Visualizador integrado de logs con cada cambio detallado
+7. Descarga logs individuales o copia la ruta de salida
 
 ---
 
@@ -127,7 +133,13 @@ python -m src.main mi_carpeta/ -o resultados/
 Cada conversión genera **dos archivos**:
 
 1. **`archivo_convertido.txt`** (o `.odt`) - Texto convertido
-2. **`archivo_convertido.log.txt`** - Log detallado con todos los cambios
+2. **`archivo_convertido.log.txt`** - Log detallado con:
+   - Total de cambios realizados
+   - Línea aproximada de cada cambio
+   - Regla aplicada (D1, D2, D3, D4, D5)
+   - Texto original y convertido lado a lado
+
+**Tip:** La interfaz web muestra estos logs de forma visual con búsqueda y filtros.
 
 ---
 
