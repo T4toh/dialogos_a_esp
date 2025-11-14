@@ -10,7 +10,7 @@ Este documento detalla las reglas oficiales de la RAE para el uso de la raya (�
 
 **Aplicación:** Diálogos simples sin etiquetas de narrador.
 
-### Ejemplos:
+### Ejemplos
 
 ```
 "Hola"          → —Hola
@@ -18,7 +18,8 @@ Este documento detalla las reglas oficiales de la RAE para el uso de la raya (�
 «Buenos días»   → —Buenos días
 ```
 
-### Notas importantes:
+### Notas importantes
+
 - La raya va **pegada** al texto (sin espacio)
 - No se cierra con segunda raya salvo que haya inciso del narrador
 - Aplica a cualquier tipo de comillas: `"` `"` `«` `»`
@@ -65,7 +66,7 @@ Este documento detalla las reglas oficiales de la RAE para el uso de la raya (�
 
 **Aplicación:** Cuando el narrador interrumpe el diálogo y el personaje continúa hablando.
 
-### Ejemplos:
+### Ejemplos
 
 ```
 "Lo principal", añadió Pilar, "es sentirse viva".
@@ -75,13 +76,15 @@ Este documento detalla las reglas oficiales de la RAE para el uso de la raya (�
 → —Esto que has hecho —gritó— es una locura!
 ```
 
-### Estructura:
+### Estructura
+
 1. **Primera raya**: Abre el diálogo
 2. **Segunda raya**: Cierra primera parte y abre inciso del narrador
 3. **Tercera raya**: Cierra inciso del narrador
 4. Continuación del diálogo (sin cuarta raya)
 
-### Puntuación crítica:
+### Puntuación crítica
+
 - La puntuación ANTES del inciso se mantiene
 - La puntuación DESPUÉS del inciso se mantiene
 - Ejemplo: `"texto", narrador, "continuación"` → `—texto —narrador—, continuación`
@@ -121,27 +124,33 @@ Este documento detalla las reglas oficiales de la RAE para el uso de la raya (�
 
 Lista de verbos que indican habla y activan la regla D2:
 
-### Verbos básicos:
+### Verbos básicos
+
 - dijo, dice, decir
 - preguntó, pregunta, preguntar
 - respondió, responde, responder
 - exclamó, exclama, exclamar
 - gritó, grita, gritar
 
-### Verbos de afirmación:
+### Verbos de afirmación
+
 - afirmó, aseguró, confirmó, declaró, manifestó
 
-### Verbos de sugerencia:
+### Verbos de sugerencia
+
 - añadió, agregó, continuó, prosiguió, siguió
 
-### Verbos de actitud:
+### Verbos de actitud
+
 - murmuró, susurró, suspiró, balbuceó
 - insistió, replicó, objetó, protestó
 
-### Verbos de intensidad:
+### Verbos de intensidad
+
 - chilló, bramó, rugió, vociferó
 
-### Verbos de comunicación:
+### Verbos de comunicación
+
 - comentó, observó, indicó, señaló, apuntó
 - advirtió, reconoció, confesó, admitió
 - propuso, sugirió, ofreció
@@ -155,12 +164,14 @@ Lista de verbos que indican habla y activan la regla D2:
 ### 1. Punto antes de verbo de dicción
 
 ❌ **INCORRECTO:**
+
 ```
 "Buenos días, Adi." dijo llena de energía.
 → —Buenos días, Adi. —dijo llena de energía.
 ```
 
 ✅ **CORRECTO:**
+
 ```
 "Buenos días, Adi", dijo llena de energía.
 → —Buenos días, Adi —dijo llena de energía.
@@ -190,13 +201,13 @@ Los signos fuertes reemplazan la coma/punto pero la estructura se mantiene.
 
 ## Espaciado
 
-### Reglas de espacios:
+### Reglas de espacios
 
 1. **Raya pegada al diálogo:** `—Hola` (sin espacio)
 2. **Espacio antes de verbo:** `—Hola —dijo` (con espacio antes de "dijo")
 3. **Raya pegada a puntuación:** `—dijo—,` (sin espacio antes de coma)
 
-### Ejemplos:
+### Ejemplos
 
 ```
 ✅ —Hola —dijo Juan.
@@ -211,7 +222,8 @@ Los signos fuertes reemplazan la coma/punto pero la estructura se mantiene.
 
 ## Estado de implementación
 
-### ✅ Implementado:
+### ✅ Implementado
+
 - [x] D1: Sustitución básica de comillas
 - [x] D2: Etiquetas con verbos de dicción
   - [x] Corrección automática de puntuación (coma vs punto)
@@ -224,19 +236,24 @@ Los signos fuertes reemplazan la coma/punto pero la estructura se mantiene.
 - [x] Reconocimiento de 44 verbos de dicción (agregado `agregó/agrega`)
 - [x] Normalización de comillas (« » " " ' ' → " ')
 
-### ⚠️ Nota importante:
+### ⚠️ Nota importante
+
 **Input correcto** según RAE para diálogos con continuación:
+
 ```
 "Es normal", agregó sonriente. "Bastien ya debe estar esperándonos."
 ```
+
 NO (punto antes de verbo):
+
 ```
 "Es normal." Agregó sonriente. "Bastien ya debe estar esperándonos."
 ```
 
 El conversor **autocorrige** puntos → comas cuando detecta verbo de dicción, pero funciona mejor con input ya correcto.
 
-### ❌ Pendiente:
+### ❌ Pendiente
+
 - [ ] Detección de diálogos con etiqueta ANTES: `Juan dijo: "Hola"`
 - [ ] Múltiples diálogos en una línea (se procesa pero puede mejorar)
 - [ ] Validación de espaciado exacto
