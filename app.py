@@ -583,9 +583,22 @@ def main():
                 st.session_state.files_info = scan_directory(
                     input_path, pattern, recursive
                 )
+                # Seleccionar todos por defecto
                 st.session_state.selected_files = {
                     f["path"] for f in st.session_state.files_info
                 }
+
+                # Limpiar cualquier checkbox previo en session_state
+                for k in list(st.session_state.keys()):
+                    if str(k).startswith("check_"):
+                        try:
+                            del st.session_state[k]
+                        except Exception:
+                            pass
+
+                # Inicializar los checkboxes para que reflejen la selección
+                for idx, _ in enumerate(st.session_state.files_info):
+                    st.session_state[f"check_{idx}"] = True
 
             if st.session_state.files_info:
                 st.success(
@@ -619,41 +632,58 @@ def main():
         # Tabla de archivos con checkboxes
         st.subheader("Seleccionar archivos a procesar")
 
-        # Checkbox para seleccionar/deseleccionar todos
-        col_all1, col_all2 = st.columns([1, 5])
+        # Botones para seleccionar/deseleccionar todos
+        col_all1, col_all2, col_all3 = st.columns([1, 1, 3])
         with col_all1:
             # Determinar si todos están seleccionados
             all_selected = len(st.session_state.selected_files) == total_files
 
-            # El checkbox refleja el estado actual
-            select_all = st.checkbox("Todos", value=all_selected)
+            # Solo mostrar el botón relevante
+            if not all_selected:
+                if st.button("Seleccionar todos", key="select_all_button"):
+                    st.session_state.selected_files = {
+                        f["path"] for f in st.session_state.files_info
+                    }
 
-            # Si el usuario cambió el estado del checkbox, actualizar selección
-            if select_all and not all_selected:
-                # Usuario marcó el checkbox → seleccionar todos
-                st.session_state.selected_files = {
-                    f["path"] for f in st.session_state.files_info
-                }
-                st.rerun()  # Forzar re-render para actualizar la UI
-            elif not select_all and all_selected:
-                # Usuario desmarcó el checkbox → deseleccionar todos
-                st.session_state.selected_files = set()
-                st.rerun()  # Forzar re-render para actualizar la UI
+                    # Marcar todos los checkboxes en session_state
+                    for idx, _ in enumerate(st.session_state.files_info):
+                        st.session_state[f"check_{idx}"] = True
+            else:
+                if st.button("Deseleccionar todos", key="deselect_all_button"):
+                    st.session_state.selected_files = set()
+
+                    # Desmarcar todos los checkboxes en session_state
+                    for idx, _ in enumerate(st.session_state.files_info):
+                        st.session_state[f"check_{idx}"] = False
 
         # Mostrar cada archivo
         for idx, file_info in enumerate(st.session_state.files_info):
             col1, col2, col3, col4, col5 = st.columns([1, 4, 1, 1, 1])
 
             with col1:
-                is_selected = file_info["path"] in st.session_state.selected_files
-                if st.checkbox(
-                    "Seleccionar",
-                    value=is_selected,
-                    key=f"check_{idx}",
-                    label_visibility="collapsed",
-                ):
-                    st.session_state.selected_files.add(file_info["path"])
+                key = f"check_{idx}"
+
+                # Estado previo según selected_files
+                was_selected = file_info["path"] in st.session_state.selected_files
+
+                # Crear checkbox sin pasar 'value' si ya existe la clave en session_state
+                if key in st.session_state:
+                    is_selected = st.checkbox(
+                        "Seleccionar", key=key, label_visibility="collapsed"
+                    )
                 else:
+                    # Si la clave no existe, pasar el valor inicial
+                    is_selected = st.checkbox(
+                        "Seleccionar",
+                        value=was_selected,
+                        key=key,
+                        label_visibility="collapsed",
+                    )
+
+                # Actualizar selección si cambió
+                if is_selected and not was_selected:
+                    st.session_state.selected_files.add(file_info["path"])
+                elif not is_selected and was_selected:
                     st.session_state.selected_files.discard(file_info["path"])
 
             with col2:
