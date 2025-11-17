@@ -2,6 +2,7 @@
 Módulo para trabajar con archivos ODT (OpenDocument Text).
 """
 
+import difflib
 import re
 import xml.etree.ElementTree as ET
 import zipfile
@@ -66,6 +67,11 @@ class ODTProcessor:
                     # Procesar content.xml preservando estructura
                     content_xml = input_zip.read("content.xml")
                     root = ET.fromstring(content_xml)
+
+                    # Construir mapa de propiedades de estilos (italic, bold...)
+                    # Esto nos permitirá normalizar estilos y evitar crear
+                    # cientos de spans distintos que representan lo mismo.
+                    self._build_style_properties(root)
 
                     # Convertir textos párrafo por párrafo
                     self._convert_paragraphs_in_tree(root, text_converter_func)
@@ -227,8 +233,8 @@ class ODTProcessor:
         # 1. Extraer mapa de formato ANTES de modificar
         format_map = self._extract_format_map(element)
 
-        # 2. Extraer segmentos de texto entre line-breaks
-        segments = self._extract_text_segments_smart(element)
+        # 2. Extraer segmentos de texto entre line-breaks Y estilos por token
+        segments, token_styles_seq = self._extract_text_segments_and_styles(element)
 
         # 3. Convertir cada segmento
         converted_segments = []
@@ -239,8 +245,16 @@ class ODTProcessor:
             else:
                 converted_segments.append(seg)
 
-        # 4. Reconstruir preservando formato según mapa
-        self._rebuild_with_format_map(element, converted_segments, format_map)
+        # 4. Reconstruir preservando formato: preferir estilos por índice (token_styles_seq)
+        #    y usar format_map consumiendo entradas (pop) como fallback.
+        # Pasar además los segmentos originales para permitir alineado token->token
+        self._rebuild_with_format_map(
+            element,
+            converted_segments,
+            format_map,
+            token_styles_seq=token_styles_seq,
+            original_segments=segments,
+        )
 
     def _extract_text_segments_smart(self, element) -> list:
         """
@@ -276,6 +290,231 @@ class ODTProcessor:
             segments.append("".join(current_text))
 
         return segments
+
+    def _split_preserving_spaces(self, text: str) -> list:
+        """
+        Divide texto en tokens preservando espacios similares a la versión anterior.
+        Retorna una lista de tokens donde las palabras y los espacios adyacentes
+        se mantienen juntos cuando sea apropiado.
+        """
+        parts = []
+        current_pos = 0
+
+        word_pattern = re.compile(r"\S+")
+
+        for match in word_pattern.finditer(text):
+            start, end = match.span()
+
+            # Añadir espacios previos si los hay
+            if start > current_pos:
+                spaces_before = text[current_pos:start]
+                if parts:
+                    parts[-1] = parts[-1] + spaces_before
+                else:
+                    parts.append(spaces_before)
+
+            # Añadir la palabra
+            word = text[start:end]
+            parts.append(word)
+            current_pos = end
+
+        # Añadir espacios finales si los hay
+        if current_pos < len(text):
+            if parts:
+                parts[-1] = parts[-1] + text[current_pos:]
+            else:
+                parts.append(text[current_pos:])
+
+        return parts
+
+    def _align_token_styles(
+        self,
+        orig_tokens: list[str],
+        orig_styles: list[Optional[str]],
+        conv_tokens: list[str],
+    ) -> list[Optional[str]]:
+        """Alinea estilos de tokens originales a tokens convertidos.
+
+        Usa SequenceMatcher para encontrar bloques iguales y asigna estilos
+        de tokens originales a tokens convertidos. Para bloques reemplazados
+        mapea por proporción de índices.
+        """
+        # Normalizar tokens (strip) para comparar
+        orig_norm = [t.strip() for t in orig_tokens]
+        conv_norm = [t.strip() for t in conv_tokens]
+
+        matcher = difflib.SequenceMatcher(None, orig_norm, conv_norm)
+        result_styles: list[Optional[str]] = [None for _ in range(len(conv_tokens))]
+
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == "equal":
+                # Copiar estilos directamente
+                for o_idx, c_idx in zip(range(i1, i2), range(j1, j2)):
+                    if o_idx < len(orig_styles):
+                        result_styles[c_idx] = orig_styles[o_idx]
+            else:
+                len_orig = i2 - i1
+                len_conv = j2 - j1
+                if len_conv <= 0:
+                    continue
+                if len_orig <= 0:
+                    # No hay tokens originales correspondentes
+                    for c_idx in range(j1, j2):
+                        result_styles[c_idx] = None
+                    continue
+                # Mapear por proporción
+                for offset in range(len_conv):
+                    # calcular índice proporcional
+                    mapped = i1 + int(offset * len_orig / len_conv)
+                    if mapped >= i2:
+                        mapped = i2 - 1
+                    if mapped < len(orig_styles):
+                        result_styles[j1 + offset] = orig_styles[mapped]
+
+        return result_styles
+
+    def _extract_text_segments_and_styles(
+        self, element
+    ) -> tuple[list[str], list[list[Optional[str]]]]:
+        """
+        Extrae segmentos de texto entre line-breaks y, para cada segmento,
+        devuelve la lista de tokens (manteniendo espacios) y una lista de estilos
+        por token (None si no hay estilo).
+
+        Returns:
+            (segments_texts, segments_token_styles) donde ambos son listas paralelas.
+        """
+        segments = []
+        segments_token_styles = []
+
+        current_chars = []
+        current_char_styles = []
+
+        ns_text = "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}"
+
+        def extract_recursive(elem, current_style=None):
+            # Actualizar estilo si el elemento es span
+            tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
+            if tag == "span":
+                style_attr = f"{ns_text}style-name"
+                current_style = elem.attrib.get(style_attr, current_style)
+
+            # Texto directo
+            if elem.text:
+                txt = elem.text
+                current_chars.append(txt)
+                # Marcar estilo por carácter
+                current_char_styles.extend([current_style] * len(txt))
+
+            for child in elem:
+                child_tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+
+                if child_tag == "line-break":
+                    # Guardar segmento actual
+                    segments.append("".join(current_chars))
+                    segments_token_styles.append([])  # placeholder, rellenaremos luego
+                    # Guardar char style snapshot
+                    # Convertir current_char_styles a lista y añadir a auxiliar
+                    # (almacenaremos el arreglo en paralelo en otra lista)
+                    # Para simplificar, almacenamos temporalmente en segments_token_styles[-1]
+                    segments_token_styles[-1] = current_char_styles.copy()
+
+                    # Limpiar acumuladores para el siguiente segmento
+                    current_chars.clear()
+                    current_char_styles.clear()
+
+                    if child.tail:
+                        txt_tail = child.tail
+                        current_chars.append(txt_tail)
+                        current_char_styles.extend([current_style] * len(txt_tail))
+                else:
+                    extract_recursive(child, current_style)
+                    if child.tail:
+                        txt_tail = child.tail
+                        current_chars.append(txt_tail)
+                        current_char_styles.extend([current_style] * len(txt_tail))
+
+        extract_recursive(element)
+
+        # Guardar último segmento
+        if current_chars:
+            segments.append("".join(current_chars))
+            segments_token_styles.append(current_char_styles.copy())
+
+        # Ahora convertir char-styles en estilos por token para cada segmento
+        segments_token_styles_by_token = []
+        for seg_text, char_styles in zip(segments, segments_token_styles):
+            tokens = self._split_preserving_spaces(seg_text)
+            token_styles = []
+            pos = 0
+            for token in tokens:
+                length = len(token)
+                # Extraer estilos de los caracteres cubiertos por este token
+                slice_styles = char_styles[pos : pos + length]
+                # Elegir primer estilo no-None si existe, sino None
+                token_style = None
+                for s in slice_styles:
+                    if s is not None:
+                        token_style = s
+                        break
+                token_styles.append(token_style)
+                pos += length
+
+            segments_token_styles_by_token.append(token_styles)
+
+        return segments, segments_token_styles_by_token
+
+    def _build_style_properties(self, root):
+        """
+        Construye un mapa de propiedades para cada style-name definido en
+        automatic-styles del documento. Guarda en `self._style_props` un dict
+        style-name -> { 'italic': bool, 'bold': bool }
+
+        También selecciona un style-name canónico para italic si encuentra uno,
+        y lo guarda en `self._canonical_style_for`.
+        """
+        self._style_props = {}
+        self._canonical_style_for = {"italic": None, "bold": None}
+
+        # namespaces declared above; no need to reassign here
+
+        # Buscar estilos dentro de automatic-styles
+        for elem in root.iter():
+            # tag completo como '{ns}style'
+            if isinstance(elem.tag, str) and elem.tag.endswith("}style"):
+                # Obtener el nombre del estilo
+                style_name = None
+                for k, v in elem.attrib.items():
+                    if k.endswith("}name") or k == "name" or k.endswith(":name"):
+                        style_name = v
+                        break
+
+                if not style_name:
+                    continue
+
+                # Buscar child text:properties dentro de este style
+                italic = False
+                bold = False
+                for child in elem:
+                    # child tag localname
+                    local = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                    if local == "text-properties":
+                        # Revisar atributos fo:font-style y fo:font-weight
+                        for ak, av in child.attrib.items():
+                            if ak.endswith("}font-style") and av == "italic":
+                                italic = True
+                            if ak.endswith("}font-weight") and av in ("bold", "700"):
+                                bold = True
+
+                self._style_props[style_name] = {"italic": italic, "bold": bold}
+
+                if italic and not self._canonical_style_for["italic"]:
+                    self._canonical_style_for["italic"] = style_name
+                if bold and not self._canonical_style_for["bold"]:
+                    self._canonical_style_for["bold"] = style_name
+
+        # If no canonical italic found, leave None; downstream we skip creating
+        # spans for non-meaningful styles.
 
     def _extract_format_map(self, element) -> dict:
         """
@@ -342,7 +581,14 @@ class ODTProcessor:
         extract_words_with_format(element)
         return format_map
 
-    def _rebuild_with_format_map(self, element, segments: list, format_map: dict):
+    def _rebuild_with_format_map(
+        self,
+        element,
+        segments: list,
+        format_map: dict,
+        token_styles_seq: Optional[list] = None,
+        original_segments: Optional[list] = None,
+    ):
         """
         Reconstruye el párrafo con line-breaks Y formato aplicado según mapa.
 
@@ -350,7 +596,10 @@ class ODTProcessor:
             element: Elemento XML del párrafo
             segments: Lista de segmentos de texto convertido
             format_map: Mapa de palabra normalizada → estilo
+            token_styles_seq: (opcional) lista paralela a segments con listas de
+                              estilos por token (None donde no había estilo).
         """
+
         def normalize_word(word: str) -> str:
             """Normaliza palabra para matching."""
             # Quitar puntuación incluyendo TODAS las comillas (ASCII + tipográficas)
@@ -359,52 +608,29 @@ class ODTProcessor:
             )
             return cleaned.lower().strip()
 
-        def get_word_style(word: str) -> Optional[str]:
-            """Obtiene el estilo de una palabra desde el mapa."""
+        def get_word_style_from_map_consume(word: str) -> Optional[str]:
+            """Obtiene el estilo de una palabra desde el mapa y lo consume (pop).
+
+            Esto ayuda a aplicar estilos repetidos en orden de aparición en el
+            documento original, evitando que siempre se use la primera entrada.
+            """
             norm_word = normalize_word(word)
             if norm_word in format_map and format_map[norm_word]:
-                # Usar el primer estilo encontrado para esa palabra
-                return format_map[norm_word][0]["style"]
+                entry = format_map[norm_word].pop(0)
+                return entry.get("style")
             return None
-
-        def split_preserving_spaces(text: str):
-            """Divide texto en tokens (palabras con espacios antes/después)."""
-            # Patrón mejorado que captura palabra + espacio siguiente
-            # O simplemente espacios al inicio/final
-            parts = []
-            current_pos = 0
-
-            # Regex para encontrar palabras (incluyendo puntuación pegada)
-            word_pattern = re.compile(r"\S+")
-
-            for match in word_pattern.finditer(text):
-                start, end = match.span()
-
-                # Añadir espacios previos si los hay
-                if start > current_pos:
-                    spaces_before = text[current_pos:start]
-                    if parts:
-                        # Añadir espacios al token anterior
-                        parts[-1] = parts[-1] + spaces_before
-                    else:
-                        # Primera palabra, añadir como token separado
-                        parts.append(spaces_before)
-
-                # Añadir la palabra
-                word = text[start:end]
-                parts.append(word)
-                current_pos = end
-
-            # Añadir espacios finales si los hay
-            if current_pos < len(text):
-                parts[-1] = parts[-1] + text[current_pos:]
-
-            return parts
 
         # Guardar atributos del párrafo
         attribs = element.attrib.copy()
 
         # Limpiar elemento
+        # Antes de limpiar el elemento, hacemos una copia NO consumible del
+        # format_map para que podamos tomar decisiones basadas en el mapa
+        # original (sin alterar) más abajo en heurísticas de corrección.
+        original_format_map = {
+            k: [entry.copy() for entry in v] for k, v in format_map.items()
+        }
+
         element.clear()
         element.attrib.update(attribs)
 
@@ -417,37 +643,167 @@ class ODTProcessor:
                 # Añadir line-break entre segmentos (se añade automáticamente al elemento)
                 ET.SubElement(element, f"{ns_text}line-break")
 
-            # Dividir el segmento en palabras
-            words = split_preserving_spaces(segment_text)
+            # Dividir el segmento en tokens (palabras y espacios)
+            words = self._split_preserving_spaces(segment_text)
 
-            # Agrupar palabras consecutivas con el mismo estilo
+            # Separar puntuación inicial (comillas de apertura, rayas) de la
+            # palabra para evitar que un carácter de puntuación que llevaba
+            # el estilo en el documento original se propague al resto de la
+            # palabra cuando la tokenización cambia (p.ej. " → —).
+            expanded_words = []
+            punct_re = re.compile(
+                r'^([\"\u201C\u201E\u2018\u201B\u00AB\u00BB\u2018\u2019\u201D\'"«»—-]+)(.*)$'
+            )
+            for w in words:
+                m = punct_re.match(w)
+                if m and m.group(2):
+                    # Mantener los espacios/colas en la segunda parte
+                    expanded_words.append(m.group(1))
+                    expanded_words.append(m.group(2))
+                else:
+                    expanded_words.append(w)
+            words = expanded_words
+
+            # Determinar estilo por token: preferir estilos por token y, si la
+            # tokenización cambió entre original y convertido, usar un
+            # alineador para mapear estilos desde tokens originales a tokens
+            # convertidos. Si aún así no hay estilo, caer al format_map.
+            ts_for_segment = None
+            if token_styles_seq and seg_idx < len(token_styles_seq):
+                ts_for_segment = token_styles_seq[seg_idx]
+
+            # Obtener estilos iniciales para los tokens convertidos
+            if (
+                ts_for_segment is not None
+                and original_segments
+                and seg_idx < len(original_segments)
+            ):
+                # Alinear tokens: tomar tokens del segmento original
+                orig_seg_text = original_segments[seg_idx]
+                orig_tokens = self._split_preserving_spaces(orig_seg_text)
+                converted_tokens = words
+                styles_for_tokens: list[Optional[str]] = self._align_token_styles(
+                    orig_tokens, ts_for_segment, converted_tokens
+                )
+            elif ts_for_segment is not None:
+                # Sin segmentos originales, intentar usar estilos por índice
+                styles_for_tokens = [
+                    ts_for_segment[i] if i < len(ts_for_segment) else None
+                    for i in range(len(words))
+                ]
+            else:
+                styles_for_tokens = [None for _ in range(len(words))]
+
+            # Para tokens, aplicar FORCED NORMALIZATION para marcadores de diálogo
+            # y luego, si no hay estilo asignado, intentar consumir del mapa por palabra.
+            for i, token in enumerate(words):
+                token_stripped = token.strip()
+
+                # Si no se asignó estilo aún, intentar consumir del mapa por palabra
+                # Intentamos esto antes de la "forced normalization" que limpia
+                # estilos en tokens seguidores de una raya. De esta forma, si
+                # la palabra realmente tenía estilo en el original (mapa), lo
+                # conservamos, evitando quitarlo por error (caso "Uno studio...").
+                if styles_for_tokens[i] is None:
+                    if token_stripped:
+                        styles_for_tokens[i] = get_word_style_from_map_consume(
+                            token_stripped
+                        )
+                    else:
+                        styles_for_tokens[i] = None
+
+                # FORCED NORMALIZATION: if the previous token is a dash/hyphen
+                # (we split leading punctuation earlier), then this token is
+                # likely the speaker label (e.g. "Me") and we should not
+                # apply the previous span's formatting to it either. Only clear
+                # the style if we still don't have one (map or alignment).
+                prev_stripped = words[i - 1].strip() if i > 0 else None
+                if prev_stripped and (
+                    prev_stripped.startswith("—") or prev_stripped.startswith("-")
+                ):
+                    if styles_for_tokens[i] is None:
+                        # leave as None (explicit) and continue
+                        continue
+
+                # FORCED NORMALIZATION: si el token empieza con raya (—) o guion (-),
+                # no aplicar formato inline bajo ninguna circunstancia.
+                if token_stripped and (
+                    token_stripped.startswith("—") or token_stripped.startswith("-")
+                ):
+                    if styles_for_tokens[i] is None:
+                        continue
+
+            # Agrupar tokens consecutivos con el mismo estilo
             groups = []
             current_group_style = None
-            current_group_words = []
+            current_group_tokens = []
 
-            for word in words:
-                word_stripped = word.strip()
-                if word_stripped:  # Palabra real
-                    word_style = get_word_style(word_stripped)
-                else:  # Solo espacios
-                    word_style = None
+            # Heurística adicional: si un token quedó sin estilo y está
+            # inmediatamente después de una raya/guion, pero el token
+            # siguiente sí tiene estilo, heredamos ese estilo. Esto ayuda
+            # a preservar casos como "—Uno studio sui draghi" donde el
+            # original tenía la frase completa en un mismo span.
+            for idx in range(len(words)):
+                prev_str = words[idx - 1].strip() if idx > 0 else None
+                if (
+                    styles_for_tokens[idx] is None
+                    and prev_str
+                    and (prev_str.startswith("—") or prev_str.startswith("-"))
+                ):
+                    # Buscar adelante el primer token con estilo no-None en una
+                    # ventana pequeña. Si lo encontramos, heredamos ese estilo.
+                    found = None
+                    for j in range(idx + 1, min(len(words), idx + 7)):
+                        if styles_for_tokens[j] is not None:
+                            found = styles_for_tokens[j]
+                            break
+                    if found:
+                        styles_for_tokens[idx] = found
 
-                if word_style == current_group_style:
-                    # Mismo estilo, añadir al grupo actual
-                    current_group_words.append(word)
+            # Heurística de corrección: en algunos casos el alineador puede
+            # asignar un estilo distinto al token inmediatamente después de
+            # una puntuación transformada (p.ej. comilla → raya). Si vemos
+            # que el token siguiente tiene estilo Y y el token actual tiene
+            # estilo X distinto, pero en el mapa original la palabra
+            # normalizada del token actual aparece asociada a Y, corregimos
+            # el estilo del token actual para coincidir con el siguiente.
+            def normalize_word_lookup(w: str) -> str:
+                cleaned = re.sub(
+                    r'[.,;:!?¿¡"\u2018\u2019\u201C\u201D\'"—()\[\]{}]',
+                    "",
+                    w,
+                )
+                return cleaned.lower().strip()
+
+            for idx in range(len(words) - 1):
+                prev_str = words[idx - 1].strip() if idx > 0 else None
+                if prev_str and (prev_str.startswith("—") or prev_str.startswith("-")):
+                    cur_style = styles_for_tokens[idx]
+                    next_style = styles_for_tokens[idx + 1]
+                    if cur_style != next_style and next_style is not None:
+                        # comprobar en el mapa original si la entrada normalizada
+                        # del token actual tenía el estilo next_style
+                        norm = normalize_word_lookup(words[idx])
+                        if norm and norm in original_format_map:
+                            styles_list = [
+                                e["style"] for e in original_format_map[norm]
+                            ]
+                            if next_style in styles_list:
+                                styles_for_tokens[idx] = next_style
+
+            for token, style in zip(words, styles_for_tokens):
+                if style == current_group_style:
+                    current_group_tokens.append(token)
                 else:
-                    # Cambio de estilo, guardar grupo actual
-                    if current_group_words:
+                    if current_group_tokens:
                         groups.append(
-                            (current_group_style, "".join(current_group_words))
+                            (current_group_style, "".join(current_group_tokens))
                         )
-                    # Iniciar nuevo grupo
-                    current_group_style = word_style
-                    current_group_words = [word]
+                    current_group_style = style
+                    current_group_tokens = [token]
 
-            # Guardar último grupo
-            if current_group_words:
-                groups.append((current_group_style, "".join(current_group_words)))
+            if current_group_tokens:
+                groups.append((current_group_style, "".join(current_group_tokens)))
 
             # Crear spans para cada grupo
             for group_idx, (style, text_content) in enumerate(groups):

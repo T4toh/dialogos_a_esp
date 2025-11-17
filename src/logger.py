@@ -2,9 +2,9 @@
 Sistema de logging para registrar todos los cambios realizados.
 """
 
-from typing import List, Tuple
-from pathlib import Path
 import io
+from pathlib import Path
+from typing import List, Tuple
 
 
 class ConversionLogger:
@@ -17,34 +17,30 @@ class ConversionLogger:
     def log_change(self, line_num: int, original: str, converted: str, rule: str):
         """
         Registra un cambio realizado.
-        
-        Args:
-            line_num: Número de línea (aproximado)
-            original: Texto original
-            converted: Texto convertido
-            rule: Regla aplicada
+            Args:
+                line_num: Número de línea (aproximado)
+                original: Texto original
+                converted: Texto convertido
+                rule: Regla aplicada
         """
         self.changes.append((line_num, original, converted, rule))
 
     def _format_text(self, text: str) -> str:
         """
         Formatea texto para el log sin truncar.
-        
-        Args:
-            text: Texto a formatear
-            
-        Returns:
-            Texto formateado
+            Args:
+                text: Texto a formatear
+            Returns:
+                Texto formateado
         """
         # Solo limpiar espacios extras pero mantener contenido completo
-        return ' '.join(text.split())
+        return " ".join(text.split())
 
     def generate_report(self) -> str:
         """
         Genera el reporte completo de cambios.
-        
-        Returns:
-            String con el reporte formateado
+            Returns:
+                String con el reporte formateado
         """
         buffer = io.StringIO()
 
@@ -79,21 +75,19 @@ class ConversionLogger:
     def save_to_file(self, filepath: Path):
         """
         Guarda el log en un archivo.
-        
-        Args:
-            filepath: Ruta del archivo de log
+            Args:
+                filepath: Ruta del archivo de log
         """
         report = self.generate_report()
-        filepath.write_text(report, encoding='utf-8')
+        filepath.write_text(report, encoding="utf-8")
 
     def get_stats(self) -> dict:
         """
         Obtiene estadísticas de la conversión.
-        
-        Returns:
-            Diccionario con estadísticas
+            Returns:
+                Diccionario con estadísticas
         """
         return {
-            'total_changes': len(self.changes),
-            'rules_applied': list(set(rule for _, _, _, rule in self.changes))
+            "total_changes": len(self.changes),
+            "rules_applied": list(set(rule for _, _, _, rule in self.changes)),
         }

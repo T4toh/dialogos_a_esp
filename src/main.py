@@ -22,21 +22,21 @@ Ejemplos de uso:
 
   # Archivo individual
   python -m src.main mi_capitulo.odt
-  
+
   # Carpeta completa (crea subcarpeta 'convertidos/')
   python -m src.main mi_novela/
-  
+
   # Especificar carpeta de salida
   python -m src.main mi_novela/ -o resultados/
-  
+
   # Solo archivos ODT
   python -m src.main mi_novela/ --filter "*.odt"
-  
+
   # Incluir subcarpetas
   python -m src.main mi_novela/ --recursive
 
 Para más información, ver README.md
-        """,
+    """,
     )
 
     parser.add_argument(

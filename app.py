@@ -72,11 +72,13 @@ def scan_directory(
 
 def format_size(size_bytes: int) -> str:
     """Formatea tamaño en bytes a formato legible."""
+    # Trabajamos con un float local para evitar que la división cambie el tipo
+    bytes_val = float(size_bytes)
     for unit in ["B", "KB", "MB", "GB"]:
-        if size_bytes < 1024.0:
-            return f"{size_bytes:.1f} {unit}"
-        size_bytes /= 1024.0
-    return f"{size_bytes:.1f} TB"
+        if bytes_val < 1024.0:
+            return f"{bytes_val:.1f} {unit}"
+        bytes_val /= 1024.0
+    return f"{bytes_val:.1f} TB"
 
 
 def list_directories(base_path: Path, max_depth: int = 2) -> List[str]:
@@ -572,7 +574,8 @@ def main():
 
     # Escanear directorio
     if scan_button:
-        input_path = Path(input_dir)
+        # input_dir puede ser None (streamlit retorna Optional[str])
+        input_path = Path(input_dir or ".")
 
         if not input_path.exists():
             st.error(f"❌ La carpeta '{input_dir}' no existe")
@@ -706,7 +709,8 @@ def main():
         col1, col2 = st.columns(2)
 
         with col1:
-            default_output = str(Path(input_dir) / "convertidos")
+            # input_dir puede ser None; usar '.' como fallback para Path
+            default_output = str(Path(input_dir or ".") / "convertidos")
             output_dir = st.text_input(
                 "📁 Carpeta de salida",
                 value=default_output,
