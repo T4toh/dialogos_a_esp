@@ -2,10 +2,11 @@
 Interfaz web con Streamlit para conversión de diálogos.
 """
 
-import streamlit as st
 import sys
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
+
+import streamlit as st
 
 # Agregar src al path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -13,13 +14,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.converter import DialogConverter
 from src.odt_handler import is_odt_file
 
-
 # Configuración de página
 st.set_page_config(
     page_title="Conversor de Diálogos",
     page_icon="📝",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 
@@ -28,10 +28,11 @@ def count_words_in_file(file_path: Path) -> int:
     try:
         if is_odt_file(file_path):
             from src.odt_handler import ODTReader
+
             reader = ODTReader(file_path)
             text = reader.extract_text()
         else:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 text = f.read()
 
         words = text.split()
@@ -40,10 +41,12 @@ def count_words_in_file(file_path: Path) -> int:
         return 0
 
 
-def scan_directory(directory: Path, pattern: str = "*.*", recursive: bool = False) -> List[Dict]:
+def scan_directory(
+    directory: Path, pattern: str = "*.*", recursive: bool = False
+) -> List[Dict]:
     """Escanea directorio y retorna información de archivos."""
     files_info = []
-    extensions = {'.odt', '.txt'}
+    extensions = {".odt", ".txt"}
 
     if recursive:
         iterator = directory.rglob(pattern)
@@ -52,27 +55,28 @@ def scan_directory(directory: Path, pattern: str = "*.*", recursive: bool = Fals
 
     for file_path in iterator:
         if file_path.is_file() and file_path.suffix in extensions:
-            if not file_path.stem.endswith('_convertido'):
+            if not file_path.stem.endswith("_convertido"):
                 word_count = count_words_in_file(file_path)
-                files_info.append({
-                    'path': file_path,
-                    'name': file_path.name,
-                    'size': file_path.stat().st_size,
-                    'words': word_count,
-                    'type': 'ODT' if is_odt_file(file_path) else 'TXT'
-                })
+                files_info.append(
+                    {
+                        "path": file_path,
+                        "name": file_path.name,
+                        "size": file_path.stat().st_size,
+                        "words": word_count,
+                        "type": "ODT" if is_odt_file(file_path) else "TXT",
+                    }
+                )
 
-    return sorted(files_info, key=lambda x: x['name'])
+    return sorted(files_info, key=lambda x: x["name"])
 
 
 def format_size(size_bytes: int) -> str:
     """Formatea tamaño en bytes a formato legible."""
-    for unit in ['B', 'KB', 'MB', 'GB']:
+    for unit in ["B", "KB", "MB", "GB"]:
         if size_bytes < 1024.0:
             return f"{size_bytes:.1f} {unit}"
         size_bytes /= 1024.0
     return f"{size_bytes:.1f} TB"
-
 
 
 def list_directories(base_path: Path, max_depth: int = 2) -> List[str]:
@@ -92,7 +96,7 @@ def list_directories(base_path: Path, max_depth: int = 2) -> List[str]:
         # Añadir subdirectorios del directorio actual
         try:
             for item in sorted(base_path.iterdir()):
-                if item.is_dir() and not item.name.startswith('.'):
+                if item.is_dir() and not item.name.startswith("."):
                     dirs.append(f"📁 {item}")
         except PermissionError:
             pass
@@ -114,7 +118,9 @@ def list_directories(base_path: Path, max_depth: int = 2) -> List[str]:
         ]
 
         for label, path in common_dirs:
-            if path.exists() and str(path) not in [d.replace("📁 ", "").replace("⬆️ ", "") for d in dirs]:
+            if path.exists() and str(path) not in [
+                d.replace("📁 ", "").replace("⬆️ ", "") for d in dirs
+            ]:
                 dirs.append(f"{label}: {path}")
 
     except Exception:
@@ -146,7 +152,7 @@ def apply_custom_theme(theme: str):
     <script>
         // Guardar tema en localStorage
         localStorage.setItem('dialogos_theme', '{theme}');
-        
+
         // Aplicar tema inmediatamente
         document.documentElement.setAttribute('data-theme', '{theme}');
     </script>
@@ -154,7 +160,8 @@ def apply_custom_theme(theme: str):
     st.markdown(theme_script, unsafe_allow_html=True)
 
     if theme == "light":
-        st.markdown("""
+        st.markdown(
+            """
         <style>
             /* Tema Claro - Completo y legible */
             :root {
@@ -163,170 +170,173 @@ def apply_custom_theme(theme: str):
                 --text-color: #262730;
                 --primary-color: #1f77b4;
             }
-            
+
             /* Fondo principal */
             .stApp {
                 background-color: #ffffff !important;
             }
-            
+
             /* Header/Toolbar de Streamlit */
             header[data-testid="stHeader"] {
                 background-color: #ffffff !important;
                 border-bottom: 1px solid #e5e7eb !important;
             }
-            
+
             /* Iconos del toolbar */
             header[data-testid="stHeader"] svg {
                 fill: #262730 !important;
                 color: #262730 !important;
             }
-            
+
             /* Botones del toolbar */
             header[data-testid="stHeader"] button {
                 color: #262730 !important;
             }
-            
+
             /* Menú hamburguesa */
             [data-testid="stToolbar"] {
                 background-color: #ffffff !important;
             }
-            
+
             [data-testid="stToolbar"] button {
                 color: #262730 !important;
             }
-            
+
             /* Sidebar */
             section[data-testid="stSidebar"] {
                 background-color: #f0f2f6 !important;
             }
-            
+
             section[data-testid="stSidebar"] * {
                 color: #262730 !important;
             }
-            
+
             /* Botones - fondo blanco, texto negro, borde */
             .stButton > button {
                 background-color: #ffffff !important;
                 color: #262730 !important;
                 border: 1px solid #d1d5db !important;
             }
-            
+
             .stButton > button:hover {
                 background-color: #f3f4f6 !important;
                 border-color: #1f77b4 !important;
             }
-            
+
             .stButton > button[kind="primary"] {
                 background-color: #1f77b4 !important;
                 color: #ffffff !important;
                 border-color: #1f77b4 !important;
             }
-            
+
             .stButton > button[kind="secondary"] {
                 background-color: #f0f2f6 !important;
                 color: #262730 !important;
                 border: 1px solid #d1d5db !important;
             }
-            
+
             /* Inputs de texto */
             .stTextInput > div > div > input {
                 background-color: #ffffff !important;
                 color: #262730 !important;
                 border-color: #d1d5db !important;
             }
-            
+
             /* Selectbox y dropdown */
             .stSelectbox > div > div {
                 background-color: #ffffff !important;
                 color: #262730 !important;
             }
-            
+
             .stSelectbox [data-baseweb="select"] > div {
                 background-color: #ffffff !important;
                 color: #262730 !important;
             }
-            
+
             /* Opciones del dropdown */
             [role="listbox"] {
                 background-color: #ffffff !important;
             }
-            
+
             [role="option"] {
                 background-color: #ffffff !important;
                 color: #262730 !important;
             }
-            
+
             [role="option"]:hover {
                 background-color: #f0f2f6 !important;
             }
-            
+
             /* Radio buttons */
             .stRadio > div {
                 color: #262730 !important;
             }
-            
+
             /* Checkboxes */
             .stCheckbox > label {
                 color: #262730 !important;
             }
-            
+
             /* Texto general */
             .stMarkdown {
                 color: #262730 !important;
             }
-            
+
             h1, h2, h3, h4, h5, h6 {
                 color: #262730 !important;
             }
-            
+
             p, span, label, div {
                 color: #262730 !important;
             }
-            
+
             /* Métricas */
             [data-testid="stMetricValue"] {
                 color: #262730 !important;
             }
-            
+
             [data-testid="stMetricLabel"] {
                 color: #6b7280 !important;
             }
-            
+
             /* Code blocks */
             code {
                 background-color: #f0f2f6 !important;
                 color: #262730 !important;
             }
-            
+
             /* Mensajes */
             .stSuccess {
                 background-color: #d1fae5 !important;
                 color: #065f46 !important;
             }
-            
+
             .stInfo {
                 background-color: #dbeafe !important;
                 color: #1e40af !important;
             }
-            
+
             .stWarning {
                 background-color: #fef3c7 !important;
                 color: #92400e !important;
             }
-            
+
             .stError {
                 background-color: #fee2e2 !important;
                 color: #991b1b !important;
             }
-            
+
             /* Progress bar */
             .stProgress > div > div {
                 background-color: #1f77b4 !important;
             }
         </style>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
     else:
-        st.markdown("""
+        st.markdown(
+            """
         <style>
             /* Tema Oscuro - Forzar todos los elementos */
             :root {
@@ -335,83 +345,86 @@ def apply_custom_theme(theme: str):
                 --text-color: #fafafa;
                 --primary-color: #3b82f6;
             }
-            
+
             .stApp {
                 background-color: #0e1117 !important;
                 color: #fafafa !important;
             }
-            
+
             /* Header/Toolbar de Streamlit */
             header[data-testid="stHeader"] {
                 background-color: #0e1117 !important;
                 border-bottom: 1px solid #262730 !important;
             }
-            
+
             /* Iconos del toolbar */
             header[data-testid="stHeader"] svg {
                 fill: #fafafa !important;
                 color: #fafafa !important;
             }
-            
+
             /* Botones del toolbar */
             header[data-testid="stHeader"] button {
                 color: #fafafa !important;
             }
-            
+
             /* Menú hamburguesa */
             [data-testid="stToolbar"] {
                 background-color: #0e1117 !important;
             }
-            
+
             [data-testid="stToolbar"] button {
                 color: #fafafa !important;
             }
-            
+
             section[data-testid="stSidebar"] {
                 background-color: #262730 !important;
             }
-            
+
             .stApp > header {
                 background-color: transparent !important;
             }
-            
+
             .stMarkdown, .stText, p, span, div {
                 color: #fafafa !important;
             }
-            
+
             .stButton > button {
                 color: #fafafa !important;
             }
-            
+
             .stTextInput > div > div > input {
                 background-color: #262730 !important;
                 color: #fafafa !important;
             }
-            
+
             .stSelectbox > div > div {
                 background-color: #262730 !important;
                 color: #fafafa !important;
             }
-            
+
             /* Métricas */
             [data-testid="stMetricValue"] {
                 color: #fafafa !important;
             }
-            
+
             /* Code blocks */
             code {
                 background-color: #262730 !important;
                 color: #fafafa !important;
             }
         </style>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
 
 def main():
     """Función principal de la aplicación."""
 
     # Script para leer tema desde localStorage
-    st.markdown("""
+    st.markdown(
+        """
     <script>
         // Intentar leer tema guardado
         const savedTheme = localStorage.getItem('dialogos_theme');
@@ -424,13 +437,15 @@ def main():
             }, '*');
         }
     </script>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     # Configurar tema - intentar recuperar de query params o usar default
-    if 'theme' not in st.session_state:
+    if "theme" not in st.session_state:
         # Intentar leer desde query params (para persistencia)
         query_params = st.query_params
-        saved_theme = query_params.get('theme', 'dark')
+        saved_theme = query_params.get("theme", "dark")
         st.session_state.theme = saved_theme
 
     apply_custom_theme(st.session_state.theme)
@@ -448,14 +463,20 @@ def main():
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🌙 Oscuro", use_container_width=True,
-                        type="primary" if st.session_state.theme == "dark" else "secondary"):
+            if st.button(
+                "🌙 Oscuro",
+                use_container_width=True,
+                type="primary" if st.session_state.theme == "dark" else "secondary",
+            ):
                 st.session_state.theme = "dark"
                 st.query_params.theme = "dark"
                 st.rerun()
         with col2:
-            if st.button("☀️ Claro", use_container_width=True,
-                        type="primary" if st.session_state.theme == "light" else "secondary"):
+            if st.button(
+                "☀️ Claro",
+                use_container_width=True,
+                type="primary" if st.session_state.theme == "light" else "secondary",
+            ):
                 st.session_state.theme = "light"
                 st.query_params.theme = "light"
                 st.rerun()
@@ -467,19 +488,19 @@ def main():
             "Modo de selección",
             ["Escribir ruta", "Selector de carpetas"],
             horizontal=True,
-            label_visibility="collapsed"
+            label_visibility="collapsed",
         )
 
         # Selección de carpeta
         if folder_mode == "Selector de carpetas":
             # Obtener directorio actual desde session_state o usar "."
-            if 'current_folder' not in st.session_state:
-                st.session_state['current_folder'] = str(Path('.').resolve())
+            if "current_folder" not in st.session_state:
+                st.session_state["current_folder"] = str(Path(".").resolve())
 
-            current_base = Path(st.session_state['current_folder'])
+            current_base = Path(st.session_state["current_folder"])
             if not current_base.exists():
-                current_base = Path('.')
-                st.session_state['current_folder'] = str(current_base.resolve())
+                current_base = Path(".")
+                st.session_state["current_folder"] = str(current_base.resolve())
 
             available_dirs = list_directories(current_base)
 
@@ -493,14 +514,14 @@ def main():
                 options=available_dirs,
                 index=0,
                 help="Selecciona una carpeta para navegar o usar",
-                label_visibility="collapsed"
+                label_visibility="collapsed",
             )
 
             # Actualizar carpeta si se seleccionó una diferente
             if not selected_dir.startswith("─"):
                 parsed_dir = parse_directory_choice(selected_dir)
                 if parsed_dir != str(current_base):
-                    st.session_state['current_folder'] = parsed_dir
+                    st.session_state["current_folder"] = parsed_dir
                     st.rerun()
 
             input_dir = str(current_base.resolve())
@@ -509,15 +530,15 @@ def main():
             # Input de texto tradicional
             input_dir = st.text_input(
                 "📂 Carpeta de entrada",
-                value=st.session_state.get('input_dir_text', '.'),
-                help="Ruta a la carpeta con archivos a procesar"
+                value=st.session_state.get("input_dir_text", "."),
+                help="Ruta a la carpeta con archivos a procesar",
             )
             # Actualizar current_folder cuando se cambia el texto
             if input_dir:
-                st.session_state['current_folder'] = input_dir
+                st.session_state["current_folder"] = input_dir
 
         # Guardar en session_state
-        st.session_state['input_dir_text'] = input_dir
+        st.session_state["input_dir_text"] = input_dir
 
         # Opciones de escaneo
         st.subheader("Opciones de búsqueda")
@@ -525,13 +546,11 @@ def main():
         file_filter = st.selectbox(
             "Tipo de archivo",
             options=["Todos (*.*)", "Solo ODT (*.odt)", "Solo TXT (*.txt)"],
-            index=0
+            index=0,
         )
 
         recursive = st.checkbox(
-            "Incluir subcarpetas",
-            value=False,
-            help="Buscar archivos en subcarpetas"
+            "Incluir subcarpetas", value=False, help="Buscar archivos en subcarpetas"
         )
 
         # Botón de escaneo
@@ -541,14 +560,14 @@ def main():
     filter_map = {
         "Todos (*.*)": "*.*",
         "Solo ODT (*.odt)": "*.odt",
-        "Solo TXT (*.txt)": "*.txt"
+        "Solo TXT (*.txt)": "*.txt",
     }
     pattern = filter_map[file_filter]
 
     # Estado de la aplicación
-    if 'files_info' not in st.session_state:
+    if "files_info" not in st.session_state:
         st.session_state.files_info = []
-    if 'selected_files' not in st.session_state:
+    if "selected_files" not in st.session_state:
         st.session_state.selected_files = set()
 
     # Escanear directorio
@@ -561,11 +580,17 @@ def main():
             st.error(f"❌ '{input_dir}' no es una carpeta")
         else:
             with st.spinner("Escaneando archivos..."):
-                st.session_state.files_info = scan_directory(input_path, pattern, recursive)
-                st.session_state.selected_files = {f['path'] for f in st.session_state.files_info}
+                st.session_state.files_info = scan_directory(
+                    input_path, pattern, recursive
+                )
+                st.session_state.selected_files = {
+                    f["path"] for f in st.session_state.files_info
+                }
 
             if st.session_state.files_info:
-                st.success(f"✅ Encontrados {len(st.session_state.files_info)} archivo(s)")
+                st.success(
+                    f"✅ Encontrados {len(st.session_state.files_info)} archivo(s)"
+                )
             else:
                 st.warning("⚠️ No se encontraron archivos")
 
@@ -575,8 +600,8 @@ def main():
 
         # Estadísticas generales
         total_files = len(st.session_state.files_info)
-        total_words = sum(f['words'] for f in st.session_state.files_info)
-        total_size = sum(f['size'] for f in st.session_state.files_info)
+        total_words = sum(f["words"] for f in st.session_state.files_info)
+        total_size = sum(f["size"] for f in st.session_state.files_info)
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -597,34 +622,51 @@ def main():
         # Checkbox para seleccionar/deseleccionar todos
         col_all1, col_all2 = st.columns([1, 5])
         with col_all1:
-            select_all = st.checkbox("Todos", value=len(st.session_state.selected_files) == total_files)
-            if select_all:
-                st.session_state.selected_files = {f['path'] for f in st.session_state.files_info}
-            elif not select_all and len(st.session_state.selected_files) == total_files:
+            # Determinar si todos están seleccionados
+            all_selected = len(st.session_state.selected_files) == total_files
+
+            # El checkbox refleja el estado actual
+            select_all = st.checkbox("Todos", value=all_selected)
+
+            # Si el usuario cambió el estado del checkbox, actualizar selección
+            if select_all and not all_selected:
+                # Usuario marcó el checkbox → seleccionar todos
+                st.session_state.selected_files = {
+                    f["path"] for f in st.session_state.files_info
+                }
+                st.rerun()  # Forzar re-render para actualizar la UI
+            elif not select_all and all_selected:
+                # Usuario desmarcó el checkbox → deseleccionar todos
                 st.session_state.selected_files = set()
+                st.rerun()  # Forzar re-render para actualizar la UI
 
         # Mostrar cada archivo
         for idx, file_info in enumerate(st.session_state.files_info):
             col1, col2, col3, col4, col5 = st.columns([1, 4, 1, 1, 1])
 
             with col1:
-                is_selected = file_info['path'] in st.session_state.selected_files
-                if st.checkbox("Seleccionar", value=is_selected, key=f"check_{idx}", label_visibility="collapsed"):
-                    st.session_state.selected_files.add(file_info['path'])
+                is_selected = file_info["path"] in st.session_state.selected_files
+                if st.checkbox(
+                    "Seleccionar",
+                    value=is_selected,
+                    key=f"check_{idx}",
+                    label_visibility="collapsed",
+                ):
+                    st.session_state.selected_files.add(file_info["path"])
                 else:
-                    st.session_state.selected_files.discard(file_info['path'])
+                    st.session_state.selected_files.discard(file_info["path"])
 
             with col2:
-                st.text(file_info['name'])
+                st.text(file_info["name"])
 
             with col3:
-                st.text(file_info['type'])
+                st.text(file_info["type"])
 
             with col4:
                 st.text(f"{file_info['words']:,} palabras")
 
             with col5:
-                st.text(format_size(file_info['size']))
+                st.text(format_size(file_info["size"]))
 
         st.markdown("---")
 
@@ -638,7 +680,7 @@ def main():
             output_dir = st.text_input(
                 "📁 Carpeta de salida",
                 value=default_output,
-                help="Carpeta donde se guardarán los archivos convertidos"
+                help="Carpeta donde se guardarán los archivos convertidos",
             )
 
         with col2:
@@ -646,16 +688,24 @@ def main():
 
         # Botón de procesamiento
         if len(st.session_state.selected_files) > 0:
-            if st.button("▶️ Iniciar Conversión", type="primary", use_container_width=True):
+            if st.button(
+                "▶️ Iniciar Conversión", type="primary", use_container_width=True
+            ):
                 process_files(st.session_state.selected_files, Path(output_dir))
         else:
             st.warning("⚠️ Selecciona al menos un archivo para procesar")
 
     # Mostrar resultados si existen en session_state
-    if 'processing_results' in st.session_state and st.session_state['processing_results']:
-        display_results(st.session_state['processing_results'], Path(st.session_state['output_directory']))
+    if (
+        "processing_results" in st.session_state
+        and st.session_state["processing_results"]
+    ):
+        display_results(
+            st.session_state["processing_results"],
+            Path(st.session_state["output_directory"]),
+        )
 
-    elif 'files_info' not in st.session_state:
+    elif "files_info" not in st.session_state:
         # Mensaje inicial solo si no hay archivos escaneados ni resultados
         st.info("👆 Selecciona una carpeta y haz clic en 'Escanear' para comenzar")
 
@@ -693,47 +743,46 @@ def process_files(selected_files: set, output_dir: Path):
             # Leer y convertir
             if is_odt_file(file_path):
                 from src.odt_handler import ODTProcessor
+
                 processor = ODTProcessor(file_path)
                 processor.process_and_save(output_file, converter.convert)
                 log_content = converter.logger.generate_report()
             else:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     text = f.read()
 
                 converted_text, logger = converter.convert(text)
 
-                with open(output_file, 'w', encoding='utf-8') as f:
+                with open(output_file, "w", encoding="utf-8") as f:
                     f.write(converted_text)
 
                 log_content = logger.generate_report()
 
             # Guardar log
             log_file = output_dir / f"{file_path.stem}_convertido.log.txt"
-            with open(log_file, 'w', encoding='utf-8') as f:
+            with open(log_file, "w", encoding="utf-8") as f:
                 f.write(log_content)
 
-            results.append({
-                'file': file_path.name,
-                'success': True,
-                'changes': len(converter.logger.changes),
-                'output': output_file,
-                'log_file': log_file
-            })
+            results.append(
+                {
+                    "file": file_path.name,
+                    "success": True,
+                    "changes": len(converter.logger.changes),
+                    "output": output_file,
+                    "log_file": log_file,
+                }
+            )
 
         except Exception as e:
-            results.append({
-                'file': file_path.name,
-                'success': False,
-                'error': str(e)
-            })
+            results.append({"file": file_path.name, "success": False, "error": str(e)})
 
     # Completar progreso
     progress_bar.progress(1.0)
     status_text.text("✅ Procesamiento completado")
 
     # Guardar resultados en session_state para persistencia
-    st.session_state['processing_results'] = results
-    st.session_state['output_directory'] = str(output_dir)
+    st.session_state["processing_results"] = results
+    st.session_state["output_directory"] = str(output_dir)
 
     # Los resultados se mostrarán automáticamente en el re-run
 
@@ -743,9 +792,9 @@ def display_results(results: List[Dict], output_dir: Path):
     st.markdown("---")
     st.subheader("📊 Resultados")
 
-    successful = [r for r in results if r['success']]
-    failed = [r for r in results if not r['success']]
-    total_changes = sum(r.get('changes', 0) for r in successful)
+    successful = [r for r in results if r["success"]]
+    failed = [r for r in results if not r["success"]]
+    total_changes = sum(r.get("changes", 0) for r in successful)
 
     # Métricas
     col1, col2, col3 = st.columns(3)
@@ -778,24 +827,29 @@ def display_results(results: List[Dict], output_dir: Path):
         st.markdown("Revisa los cambios realizados en cada archivo")
 
         # Iterar sobre todos los archivos procesados (ordenados alfabéticamente)
-        sorted_results = sorted(successful, key=lambda x: x['file'])
+        sorted_results = sorted(successful, key=lambda x: x["file"])
 
         for idx, result in enumerate(sorted_results):
             # Usar hash del log_file como key única
-            file_key = str(result.get('log_file', idx))
+            file_key = str(result.get("log_file", idx))
 
-            with st.expander(f"📄 {result['file']} ({result['changes']} cambios)", expanded=(idx == 0)):
+            with st.expander(
+                f"📄 {result['file']} ({result['changes']} cambios)",
+                expanded=(idx == 0),
+            ):
                 # Usar el log_file que se guardó durante el procesamiento
-                log_file = result.get('log_file')
+                log_file = result.get("log_file")
 
                 if log_file and Path(log_file).exists():
                     # Leer contenido del log
-                    current_log_content = Path(log_file).read_text(encoding='utf-8')
+                    current_log_content = Path(log_file).read_text(encoding="utf-8")
 
                     # Opciones de visualización (keys únicas por archivo)
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        show_full = st.checkbox("Mostrar todos", value=False, key=f"full_{file_key}")
+                        show_full = st.checkbox(
+                            "Mostrar todos", value=False, key=f"full_{file_key}"
+                        )
                     with col2:
                         max_changes = st.number_input(
                             "Cambios a mostrar",
@@ -804,7 +858,7 @@ def display_results(results: List[Dict], output_dir: Path):
                             value=50,
                             step=5,
                             disabled=show_full,
-                            key=f"max_{file_key}"
+                            key=f"max_{file_key}",
                         )
                     with col3:
                         st.download_button(
@@ -813,7 +867,7 @@ def display_results(results: List[Dict], output_dir: Path):
                             file_name=Path(log_file).name,
                             mime="text/plain",
                             use_container_width=True,
-                            key=f"download_{file_key}"
+                            key=f"download_{file_key}",
                         )
 
                     # Parsear cambios del log (scope local para este archivo)
@@ -822,49 +876,79 @@ def display_results(results: List[Dict], output_dir: Path):
                         all_changes_local = []
                         current_change_local = None
 
-                        for line in log_text.split('\n'):
+                        for line in log_text.split("\n"):
                             if line.startswith("CAMBIO #"):
                                 if current_change_local:
                                     all_changes_local.append(current_change_local)
                                 current_change_local = {
-                                    'numero': line.strip(),
-                                    'ubicacion': '',
-                                    'regla': '',
-                                    'original': [],
-                                    'convertido': [],
-                                    'section': None
+                                    "numero": line.strip(),
+                                    "ubicacion": "",
+                                    "regla": "",
+                                    "original": [],
+                                    "convertido": [],
+                                    "section": None,
                                 }
                             elif current_change_local:
                                 line_stripped = line.strip()
                                 if line_stripped.startswith("Línea:"):
-                                    current_change_local['ubicacion'] = line_stripped.replace("Línea:", "").strip()
+                                    current_change_local["ubicacion"] = (
+                                        line_stripped.replace("Línea:", "").strip()
+                                    )
                                 elif line_stripped.startswith("Regla:"):
-                                    current_change_local['regla'] = line_stripped.replace("Regla:", "").strip()
+                                    current_change_local["regla"] = (
+                                        line_stripped.replace("Regla:", "").strip()
+                                    )
                                 elif line_stripped == "ORIGINAL:":
-                                    current_change_local['section'] = 'original'
+                                    current_change_local["section"] = "original"
                                 elif line_stripped == "CONVERTIDO:":
-                                    current_change_local['section'] = 'convertido'
+                                    current_change_local["section"] = "convertido"
                                 elif line.startswith("---"):
                                     continue
-                                elif current_change_local['section'] == 'original' and line_stripped:
-                                    current_change_local['original'].append(line_stripped)
-                                elif current_change_local['section'] == 'convertido' and line_stripped:
-                                    current_change_local['convertido'].append(line_stripped)
+                                elif (
+                                    current_change_local["section"] == "original"
+                                    and line_stripped
+                                ):
+                                    current_change_local["original"].append(
+                                        line_stripped
+                                    )
+                                elif (
+                                    current_change_local["section"] == "convertido"
+                                    and line_stripped
+                                ):
+                                    current_change_local["convertido"].append(
+                                        line_stripped
+                                    )
 
                         if current_change_local:
                             all_changes_local.append(current_change_local)
 
                         # Mostrar cambios
-                        changes_to_show_local = all_changes_local if show_all else all_changes_local[:max_to_show]
-                        st.markdown(f"**Mostrando {len(changes_to_show_local)} de {len(all_changes_local)} cambios**")
+                        changes_to_show_local = (
+                            all_changes_local
+                            if show_all
+                            else all_changes_local[:max_to_show]
+                        )
+                        st.markdown(
+                            f"**Mostrando {len(changes_to_show_local)} de {len(all_changes_local)} cambios**"
+                        )
 
                         for change in changes_to_show_local:
                             with st.container():
-                                orig_text = ' '.join(change['original']) if change['original'] else 'N/A'
-                                conv_text = ' '.join(change['convertido']) if change['convertido'] else 'N/A'
+                                orig_text = (
+                                    " ".join(change["original"])
+                                    if change["original"]
+                                    else "N/A"
+                                )
+                                conv_text = (
+                                    " ".join(change["convertido"])
+                                    if change["convertido"]
+                                    else "N/A"
+                                )
 
                                 st.markdown(f"**{change['numero']}**")
-                                st.markdown(f"*Línea {change['ubicacion']} • {change['regla']}*")
+                                st.markdown(
+                                    f"*Línea {change['ubicacion']} • {change['regla']}*"
+                                )
                                 st.markdown("**Original:**")
                                 st.code(orig_text, language=None)
                                 st.markdown("**Convertido:**")
@@ -878,9 +962,13 @@ def display_results(results: List[Dict], output_dir: Path):
 
                     # Estadísticas de reglas
                     rules_count = {}
-                    for line in current_log_content.split('\n'):
-                        if 'Regla aplicada:' in line or 'Regla:' in line:
-                            rule = line.replace("Regla:", "").replace("Regla aplicada:", "").strip()
+                    for line in current_log_content.split("\n"):
+                        if "Regla aplicada:" in line or "Regla:" in line:
+                            rule = (
+                                line.replace("Regla:", "")
+                                .replace("Regla aplicada:", "")
+                                .strip()
+                            )
                             rules_count[rule] = rules_count.get(rule, 0) + 1
 
                     if rules_count:
@@ -888,18 +976,22 @@ def display_results(results: List[Dict], output_dir: Path):
                         col1, col2 = st.columns(2)
                         with col1:
                             st.markdown("**Reglas más aplicadas:**")
-                            sorted_rules = sorted(rules_count.items(), key=lambda x: x[1], reverse=True)
+                            sorted_rules = sorted(
+                                rules_count.items(), key=lambda x: x[1], reverse=True
+                            )
                             for rule, count in sorted_rules[:5]:
                                 st.text(f"{rule}: {count} veces")
 
                         with col2:
                             st.markdown("**Distribución:**")
                             for rule, count in sorted_rules[:5]:
-                                percentage = (count / result['changes']) * 100
-                                st.progress(percentage / 100, text=f"{rule}: {percentage:.1f}%")
+                                percentage = (count / result["changes"]) * 100
+                                st.progress(
+                                    percentage / 100, text=f"{rule}: {percentage:.1f}%"
+                                )
                 else:
                     st.warning("⚠️ No se encontró el archivo de log")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
