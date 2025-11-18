@@ -3,6 +3,7 @@ Tests para el conversor de diálogos.
 """
 
 import unittest
+from typing import Tuple, cast
 
 from src.converter import DialogConverter
 
@@ -134,17 +135,159 @@ class TestDialogConverter(unittest.TestCase):
 
     def test_complex_narration_interruption(self):
         """Test: Diálogo interrumpido por narración compleja (RAE 2.3.d)."""
-        input_text = '"Es una demostración de capacidad, querida." El hombre agregó al instante. "¿Cómo es la educación en este lugar, director?"'
-        expected = "—Es una demostración de capacidad, querida. —El hombre agregó al instante. —¿Cómo es la educación en este lugar, director?"
+        input_text = (
+            '"Es una demostración de capacidad, querida." El hombre agregó al '
+            'instante. "¿Cómo es la educación en este lugar, director?"'
+        )
+        expected = (
+            "—Es una demostración de capacidad, querida. "
+            "—El hombre agregó al instante. "
+            "—¿Cómo es la educación en este lugar, director?"
+        )
         result, _ = self.converter.convert(input_text)
         self.assertEqual(result, expected)
 
     def test_long_dialog_continuation(self):
         """Test: Diálogo largo con continuación."""
-        input_text = '"Reunión familiar…" Dijo jocoso Bastien. "Miralo a Chispita, con una princesa en la cama."'
-        expected = "—Reunión familiar… —dijo jocoso Bastien. —Miralo a Chispita, con una princesa en la cama."
+        input_text = (
+            '"Reunión familiar…" Dijo jocoso Bastien. '
+            '"Miralo a Chispita, con una princesa en la cama."'
+        )
+        expected = (
+            "—Reunión familiar… —dijo jocoso Bastien. "
+            "—Miralo a Chispita, con una princesa en la cama."
+        )
         result, _ = self.converter.convert(input_text)
         self.assertEqual(result, expected)
+
+    def test_structured_log_spans_for_examples(self):
+        """Verifica que el log estructurado incluya spans consistentes."""
+        text = (
+            '"Nada…" dijo.\n"Me contó un pajarito, sí, me dijo"\n"Vestite..." y se fue'
+        )
+        _, logger = self.converter.convert(text)
+
+        # Guardar en un path temporal.
+        # En memoria sería ideal, pero usamos tmp por simplicidad.
+        import json
+        from pathlib import Path
+
+        p = Path("tmp_test_structured.json")
+        try:
+            logger.save_structured_log(p)
+            data = json.loads(p.read_text(encoding="utf-8"))
+
+            # Deben existir 3 entradas
+            self.assertEqual(len(data), 3)
+
+            for entry in data:
+                # Fragmentos y spans deben existir y coincidir
+                self.assertIsNotNone(entry.get("original_fragment"))
+                span_value = entry.get("original_span")
+                if span_value is None:
+                    self.fail("original_span is None")
+                # Inform the type checker that this is an (int, int) pair.
+                span = cast(Tuple[int, int], span_value)
+                s, e = span
+                self.assertEqual(entry["original"][s:e], entry["original_fragment"])
+
+        finally:
+            try:
+                p.unlink()
+            except Exception:
+                pass
+
+    def test_fuzzy_span_fallback(self):
+        """Verifica que cuando el fragmento contiene más texto que el 'original'
+        (por ejemplo por oraciones contiguas con puntos suspensivos) la
+        detección de span hace fallback por coincidencia más larga."""
+        text = '"Nada que ocultar… espero." dijo alguien.'
+        _, logger = self.converter.convert(text)
+
+        # Buscar entrada con D1 o similar
+        found = False
+        for rec in logger.changes:
+            if "Nada que ocultar" in rec.get("original", ""):
+                found = True
+                # Debe existir un fragment con el que coincida
+                self.assertIsNotNone(rec.get("original_fragment"))
+                # Y el span debe existir (fuzzy fallback podrá rellenarlo)
+                span_value = rec.get("original_span")
+                if span_value is None:
+                    self.fail("original_span is None")
+                self.assertIsInstance(span_value, list)
+                # Cast to a fixed two-int tuple for static checkers, then unpack.
+                span = cast(Tuple[int, int], tuple(span_value))
+                s, e = span
+                self.assertGreater(e - s, 0)
+                break
+
+        self.assertTrue(
+            found,
+            "No se encontró la entrada que contiene 'Nada que ocultar'"
+            " en logger.changes",
+        )
+
+    def test_full_text_span_for_multisentence_fragment(self):
+        """
+        Verifica que cuando _get_sentence_context corta la oración,
+        el 'full_text' se use como fallback.
+        """
+        text = '"No… sí… capaz." Dijo alguien.'
+        _, logger = self.converter.convert(text)
+
+        found = False
+        for rec in logger.changes:
+            if "No…" in rec.get("original", ""):
+                found = True
+                # full_text fallback should put 'capaz' in original
+                self.assertIn("capaz", rec.get("original", ""))
+                self.assertIsNotNone(rec.get("original_span"))
+                break
+
+        self.assertTrue(found, "No se encontró la entrada esperada en logger.changes")
+
+    def test_converted_span_present_for_tag(self):
+        """Verifica que para etiquetas de diálogo encontremos un converted_span.
+
+        Evita casos donde solo aparece una "borrada" en la interfaz.
+        """
+        text = '"No… sí… capaz." Dijo alguien.'
+        _, logger = self.converter.convert(text)
+
+        # Encontrar la entrada D2
+        found = False
+        for rec in logger.changes:
+            if rec.get("rule", "").startswith("D2") and "No…" in rec.get(
+                "original", ""
+            ):
+                found = True
+                self.assertIsNotNone(
+                    rec.get("converted_span"), "Converted span no debe ser None"
+                )
+                break
+
+        self.assertTrue(found, "No se encontró entrada D2 para la frase esperada")
+
+    def test_noop_d1_diálogo_adicional_suppressed(self):
+        """
+        Asegura que los registros D1 no-op (sin cambio)
+        no se guarden en el logger.
+        """
+
+        text = '"Hola" dijo Juan. "Tengo…"'
+        _, logger = self.converter.convert(text)
+
+        # Buscar D1 entries
+        rule_name = "D1: Diálogo adicional en línea"
+        d1_entries = [r for r in logger.changes if r.get("rule") == rule_name]
+
+        for rec in d1_entries:
+            self.assertNotEqual(
+                rec.get("original", "").strip(),
+                rec.get("converted", "").strip(),
+                "Found a D1 entry with no-op conversion; should be suppressed",
+            )
 
     def test_quote_within_dialog_vs_continuation(self):
         """Test: Cita interna vs continuación de diálogo."""

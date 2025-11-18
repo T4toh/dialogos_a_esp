@@ -2,11 +2,35 @@
 
 Historial de cambios del proyecto.
 
+<!-- markdownlint-disable MD024 -->
+
 ---
 
 ## [1.6.0] - 2025-01-14
 
-### Agregado
+## [1.6.2] - 2025-11-17
+
+### Añadido
+
+- `ConversionLogger.post_process_line_spans()`: intenta localizar `converted_fragment` en la línea final convertida para mejorar la precisión de `converted_span`.
+- `logger.save_structured_log()` ahora exporta `original_span_source` y `converted_span_source` para indicar cómo se calcularon los offsets (`exact`, `fuzzy`, `raw`, `full_text`, `full_converted`, `normalized`).
+
+### Corregido
+
+- Ruido de logs (D1): entradas de `D1: Diálogo adicional en línea` que no producen cambios visibles (no-op) ya no se registran. Evita CAMBIO sin efecto.
+
+### Mejorado
+
+- Heurística para encontrar `converted_span`: normalización de signos tipográficos (— → -, … → ...) y escaneo normalizado para mejorar matches cuando los símbolos difieren.
+- UI: visor JSON preferido en Streamlit; ahora muestra `span_source` y permite filtrar por el origen del span en la vista (ayuda a identificar fuzzy/full-text matches).
+- Mejor re-aplicación de estilos inline en ODT cuando el texto convertido introduce o mueve marcas (p. ej. raya) — reduce fugas de estilo.
+
+### Tests
+
+- Nuevos tests que cubren `post_process_line_spans`, heurística de normalización y la supresión de D1-no-op (`tests/test_converter.py::test_noop_d1_diálogo_adicional_suppressed`).
+
+### Añadidos (logs y offsets)
+
 - **REGLAS_RAE.md**: Documentación completa de reglas RAE para diálogos con raya
   - 5 reglas principales (D1-D5) explicadas en detalle con ejemplos
   - 42 verbos de dicción listados y categorizados
@@ -22,7 +46,8 @@ Historial de cambios del proyecto.
   - Comillas simples `' '` → `' '`
   - Garantiza detección consistente de diálogos
 
-### Corregido
+### Arreglado
+
 - **Puntuación antes de verbos de dicción**: Corrección automática según RAE
   - Detecta y corrige: `"texto." verbo` → `"texto", verbo`
   - Ejemplo: `"Buenos días, Adi." dijo` → `—Buenos días, Adi —dijo` (sin punto antes de raya)
@@ -34,6 +59,7 @@ Historial de cambios del proyecto.
   - Logs en interfaz web ahora muestran contenido correcto por archivo
 
 ### Cambiado
+
 - **Limpieza general del código** (pasó linting ruff):
   - Type hints: Agregado `Optional[str]` donde funciones retornan `None`
   - Excepciones: `except:` → `except Exception:` (no bare except)
@@ -45,6 +71,7 @@ Historial de cambios del proyecto.
   - README.md: Info del visualizador de logs y estadísticas integrados
 
 ### Removed
+
 - MEJORAS_DIALOGOS.md (contenido consolidado en REGLAS_RAE.md)
 
 ---
@@ -72,7 +99,7 @@ Historial de cambios del proyecto.
   - Límite aumentado a 150 caracteres (antes 100)
   - Ahora ambos textos se truncan en el MISMO punto lógico
 
-### Mejorado
+### Mejoras
 
 - **Legibilidad de logs**
   - Textos cortos (<150 chars) se muestran completos
@@ -98,31 +125,38 @@ Historial de cambios del proyecto.
   - Antes: Todo el capítulo en 12 líneas pegadas
   - Ahora: 386 líneas correctamente separadas
   - Afectaba archivos ODT creados en LibreOffice con Shift+Enter
-  
+
 ### Corregido
 
-- **ODTReader._get_paragraph_text() reescrito**
+- **ODTReader.\_get_paragraph_text() reescrito**
   - Ahora es recursivo para procesar line-breaks dentro de spans
   - Convierte `<text:line-break/>` a `\n` correctamente
   - Preserva estructura de párrafos largos con saltos internos
-  
+
 ### Impacto
 
 - **Antes (v1.4.4):**
-  ```
+
+  ````text
   ...peinado.Técnica Arcana."Me contó...
-  ```
+  ```text
+
   (Todo pegado, ilegible)
 
+  ````
+
 - **Ahora (v1.5.0):**
-  ```
+
+  ````text
   ...peinado.
   —Buenos días, Adi. —dijo llena de energía.
   Sus cabellos castaños...
-  ```
-  (Correctamente separado)
+  ```text
 
-### Tests
+  (Correctamente separado)
+  ````
+
+### Tests nuevos
 
 - 27/27 tests pasando ✓
 - Probado con novela completa de ejemplo
@@ -154,13 +188,14 @@ Historial de cambios del proyecto.
 ### Añadido
 
 - **Soporte para narración compleja entre diálogos (RAE 2.3.d)**
+
   - Ejemplo: `"Demo." El hombre agregó. "¿Y ahora?"` → `—Demo. —El hombre agregó. —¿Y ahora?`
   - Ahora detecta correctamente narración sin verbo de lengua
   - Agrega raya de apertura antes de narración con mayúscula
   - Test específico agregado para caso complejo
 
 - **Link a reglas RAE en README**
-  - Referencia oficial: https://www.rae.es/dpd/raya
+  - Referencia oficial: <https://www.rae.es/dpd/raya>
   - Ejemplos según RAE en la documentación
   - Explicación clara de cada regla implementada
 
@@ -187,8 +222,8 @@ Historial de cambios del proyecto.
   - `"Cortesía." dijo` ahora produce `—Cortesía. —dijo.` (mantiene el punto del diálogo)
   - Antes quitaba incorrectamente el punto: `—Cortesía —dijo.` ❌
   - Ahora sigue la norma RAE: mantener puntuación original del diálogo ✓
-  - Referencia: https://www.rae.es/dpd/raya
-  
+  - Referencia: <https://www.rae.es/dpd/raya>
+
 ### Ejemplos RAE implementados
 
 - `"¡Qué le vamos a hacer!" exclamó` → `—¡Qué le vamos a hacer! —exclamó`
@@ -219,6 +254,7 @@ Historial de cambios del proyecto.
 ### Añadido
 
 - **Interfaz web con Streamlit**
+
   - Navegador visual de carpetas con ⬆️ (padre) y 📁 (subcarpetas)
   - Accesos rápidos a carpetas comunes (Inicio, Documentos, Escritorio)
   - Contador de palabras por archivo
@@ -328,4 +364,53 @@ Historial de cambios del proyecto.
 ---
 
 **Última actualización:** 2025-01-13  
-**Versión actual:** 1.5.2
+**Versión actual:** 1.6.2
+
+---
+
+## [1.6.1] - 2025-11-17
+
+### [1.6.2] - 2025-11-17
+
+### Agregado
+
+- `logger.save_structured_log()` ahora exporta `original_span_source` y `converted_span_source` para indicar cómo se hallaron los offsets (exact, fuzzy, raw, full_text, full_converted, normalized). Esto permite depurar y filtrar entradas en la UI.
+
+### Corregido
+
+- Reducción de ruido en logs: entradas D1 (diálogos adicionales en la misma línea) que no producen cambios visibles (no-op) ya no se registran. Evita mostrar muchos CAMBIO sin efecto (ej. `"Tengo…"` → `"Tengo…"` donde no hay texto añadido).
+
+### Mejorado
+
+- Mejor detección de `converted_span`: se añadió una heurística de normalización de puntuación (— → -, … → ...) para encontrar matches en el texto convertido cuando los símbolos tipográficos difieren.
+- `ConversionLogger.post_process_line_spans()` intenta enriquecer los spans buscándolos en la línea convertida final, reduciendo entradas que sólo muestran una eliminación en el diff.
+- UI: el visor de Streamlit ahora muestra `span_source` para cada `entry` si está disponible y permite filtrar por esas entradas (mejora la trazabilidad en archivos largos).
+
+### Tests
+
+- Nuevos tests: `tests/test_converter.py::test_noop_d1_diálogo_adicional_suppressed` y otros tests relacionados con `post_process_line_spans` y heurística de normalización.
+
+**Última actualización:** 2025-11-17
+**Versión actual:** 1.6.2
+
+### Agregado
+
+- Token-level aligner: mejor alineación token⇒token para re-aplicar estilos inline en ODT sin corromper spans.
+- Exportación de logs estructurados en JSON por archivo (`*_convertido.log.json`) para inspección programática.
+
+### Mejorado
+
+- Reaplicación de estilos inline en ODT: heurísticas para evitar "fugas" de itálicas/negritas tras marcas de diálogo (p. ej. después de una raya o etiqueta narrativa).
+- Logger y UI: ahora los logs preservan el bloque/sentencia completa y muestran un diff unificado; el visor en Streamlit renderiza el bloque completo y el diff.
+- `DialogConverter`: las llamadas al logger ahora registran el bloque/sentencia completa (no sólo el fragmento emparejado) para que el log incluya lo que viene después de verbos como "dijo".
+
+### Corregido
+
+- Varios avisos de tipado y estilo (Pylance / ruff): ajustes de anotaciones, inicializaciones seguras y pequeños refactors.
+
+### Tests
+
+- Suite ampliada y verificada: 29 tests (1 skipped en ausencia de ejemplo ODT) — se añaden tests orientados a párrafos problemáticos con extract/rebuild.
+
+**Última actualización:** 2025-11-17
+**Versión actual:** 1.6.2

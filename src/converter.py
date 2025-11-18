@@ -26,6 +26,28 @@ class DialogConverter:
         self.logger = ConversionLogger()
         self.current_line = 0
 
+    def _get_sentence_context(self, full_line: str, match) -> str:
+        """
+        Extrae la oración (bloque) completa en `full_line` que contiene la
+        coincidencia `match`. Intenta separar por puntos, signos de pregunta
+        o exclamación y devuelve el segmento que contiene la coincidencia.
+        Si no se encuentra, devuelve la línea completa.
+        """
+        try:
+            start, end = match.span()
+        except Exception:
+            # Si no es un objeto re.Match, devolver full_line
+            return full_line
+
+        # Patrón simple para oraciones: captura hasta un terminador o fin de línea
+        sentence_pattern = re.compile(r".+?(?:[\.\?!…](?=\s|$)|$)")
+        for m in sentence_pattern.finditer(full_line):
+            s0, s1 = m.span()
+            if s0 <= start < s1:
+                return full_line[s0:s1].strip()
+
+        return full_line.strip()
+
     def convert(self, text: str) -> Tuple[str, ConversionLogger]:
         """
         Convierte un texto completo.
@@ -45,6 +67,14 @@ class DialogConverter:
         for line_num, line in enumerate(lines, 1):
             self.current_line = line_num
             converted_line = self._convert_line(line)
+            # After finishing modifications to the line, attempt to post-process
+            # spans so converted fragments are located against the final
+            # converted line. This reduces deletion-only diffs.
+            try:
+                self.logger.post_process_line_spans(line_num, converted_line)
+            except Exception:
+                # Non-fatal; logging enrichment is optional
+                pass
             converted_lines.append(converted_line)
 
         return "\n".join(converted_lines), self.logger
@@ -181,7 +211,11 @@ class DialogConverter:
 
             # Estructura RAE: —texto1 —verbo resto—, texto2
             if verb_rest:
-                result = f"{self.EM_DASH}{text1} {self.EM_DASH}{verb} {verb_rest}{self.EM_DASH}, {text2}"
+                result = (
+                    f"{self.EM_DASH}{text1} "
+                    f"{self.EM_DASH}{verb} {verb_rest}{self.EM_DASH}, "
+                    f"{text2}"
+                )
             else:
                 result = (
                     f"{self.EM_DASH}{text1} {self.EM_DASH}{verb}{self.EM_DASH}, {text2}"
@@ -190,11 +224,17 @@ class DialogConverter:
             if original != line:
                 return result
 
+            sentence = self._get_sentence_context(line, match)
+            converted_sentence = sentence.replace(match.group(0), result, 1)
             self.logger.log_change(
                 self.current_line,
+                sentence,
+                converted_sentence,
+                "D3: Inciso del narrador con continuación",
                 match.group(0),
                 result,
-                "D3: Inciso del narrador con continuación",
+                full_text=original,
+                full_converted=converted_sentence,
             )
             return result
 
@@ -214,7 +254,11 @@ class DialogConverter:
 
             # Estructura RAE: —texto1 —verbo resto—. texto2
             if verb_rest:
-                result = f"{self.EM_DASH}{text1} {self.EM_DASH}{verb} {verb_rest}{self.EM_DASH}. {text2}"
+                result = (
+                    f"{self.EM_DASH}{text1} "
+                    f"{self.EM_DASH}{verb} {verb_rest}{self.EM_DASH}. "
+                    f"{text2}"
+                )
             else:
                 result = (
                     f"{self.EM_DASH}{text1} {self.EM_DASH}{verb}{self.EM_DASH}. {text2}"
@@ -223,11 +267,17 @@ class DialogConverter:
             if original != line:
                 return result
 
+            sentence = self._get_sentence_context(line, match)
+            converted_sentence = sentence.replace(match.group(0), result, 1)
             self.logger.log_change(
                 self.current_line,
+                sentence,
+                converted_sentence,
+                "D3: Inciso del narrador con continuación (punto)",
                 match.group(0),
                 result,
-                "D3: Inciso del narrador con continuación (punto)",
+                full_text=original,
+                full_converted=converted_sentence,
             )
             return result
 
@@ -272,16 +322,26 @@ class DialogConverter:
 
             # Estructura RAE: —texto1 —Narración—. texto2
             # Para narración intermedia entre diálogos, texto1 NO lleva punto final
-            result = f"{self.EM_DASH}{text1} {self.EM_DASH}{narration}{self.EM_DASH}. {text2}"
+            result = (
+                f"{self.EM_DASH}{text1} "
+                f"{self.EM_DASH}{narration}{self.EM_DASH}. "
+                f"{text2}"
+            )
 
             if original != line:
                 return result
 
+            sentence = self._get_sentence_context(line, match)
+            converted_sentence = sentence.replace(match.group(0), result, 1)
             self.logger.log_change(
                 self.current_line,
+                sentence,
+                converted_sentence,
+                "D4: Narración intermedia con continuación",
                 match.group(0),
                 result,
-                "D4: Narración intermedia con continuación",
+                full_text=original,
+                full_converted=converted_sentence,
             )
             return result
 
@@ -293,7 +353,8 @@ class DialogConverter:
         Ejemplo: "Hola" dijo Juan. → —Hola —dijo Juan.
         """
         # Patrón para diálogos con etiqueta
-        # Captura: comillas + contenido + comillas + espacio + posible puntuación + etiqueta
+        # Captura: comillas + contenido + comillas + espacio
+        # + posible puntuación + etiqueta
 
         # Patrón 1: "texto" verbo (comillas tipográficas y rectas)
         pattern1 = re.compile(
@@ -328,8 +389,17 @@ class DialogConverter:
             if original != line:
                 return result
 
+            sentence = self._get_sentence_context(line, match)
+            converted_sentence = sentence.replace(match.group(0), result, 1)
             self.logger.log_change(
-                self.current_line, match.group(0), result, "D2: Etiqueta de diálogo"
+                self.current_line,
+                sentence,
+                converted_sentence,
+                "D2: Etiqueta de diálogo",
+                match.group(0),
+                result,
+                full_text=original,
+                full_converted=converted_sentence,
             )
             return result
 
@@ -367,11 +437,17 @@ class DialogConverter:
                 else:
                     result = f"{self.EM_DASH}{content} {self.EM_DASH}{word.lower()}"
 
+                sentence = self._get_sentence_context(line, match)
+                converted_sentence = sentence.replace(match.group(0), result, 1)
                 self.logger.log_change(
                     self.current_line,
+                    sentence,
+                    converted_sentence,
+                    "D2: Etiqueta de diálogo con mayúscula",
                     match.group(0),
                     result,
-                    "D2: Etiqueta de diálogo con mayúscula",
+                    full_text=original,
+                    full_converted=converted_sentence,
                 )
                 return result
             else:
@@ -382,11 +458,17 @@ class DialogConverter:
                 else:
                     result = f"{self.EM_DASH}{content}. {self.EM_DASH}{word}"
 
+                sentence = self._get_sentence_context(line, match)
+                converted_sentence = sentence.replace(match.group(0), result, 1)
                 self.logger.log_change(
                     self.current_line,
+                    sentence,
+                    converted_sentence,
+                    "D3: Diálogo seguido de narración",
                     match.group(0),
                     result,
-                    "D3: Diálogo seguido de narración",
+                    full_text=original,
+                    full_converted=converted_sentence,
                 )
                 return result
 
@@ -422,11 +504,16 @@ class DialogConverter:
             else:
                 result = f"{self.EM_DASH}{content} {self.EM_DASH}{tag.lower()}"
 
+            sentence = self._get_sentence_context(line, match)
+            converted_sentence = sentence.replace(match.group(0), result, 1)
             self.logger.log_change(
                 self.current_line,
+                sentence,
+                converted_sentence,
+                "D2: Etiqueta de diálogo (comillas simples)",
                 match.group(0),
                 result,
-                "D2: Etiqueta de diálogo (comillas simples)",
+                full_text=original,
             )
             return result
 
@@ -454,11 +541,17 @@ class DialogConverter:
             content = match.group(2)
             result = f"{indent}{self.EM_DASH}{content}"
 
+            sentence = self._get_sentence_context(line, match)
+            converted_sentence = sentence.replace(match.group(0), result, 1)
             self.logger.log_change(
                 self.current_line,
+                sentence,
+                converted_sentence,
+                "D1: Sustitución de delimitadores",
                 match.group(0),
                 result,
-                "D1: Sustitución de delimitadores",
+                full_text=original,
+                full_converted=converted_sentence,
             )
             return result
 
@@ -477,11 +570,17 @@ class DialogConverter:
             content = match.group(2)
             result = f"{indent}{self.EM_DASH}{content}"
 
+            sentence = self._get_sentence_context(line, match)
+            converted_sentence = sentence.replace(match.group(0), result, 1)
             self.logger.log_change(
                 self.current_line,
+                sentence,
+                converted_sentence,
+                "D1: Sustitución de delimitadores (comillas simples)",
                 match.group(0),
                 result,
-                "D1: Sustitución de delimitadores (comillas simples)",
+                full_text=original,
+                full_converted=converted_sentence,
             )
             return result
 
@@ -513,18 +612,25 @@ class DialogConverter:
             ):
                 result = f"{space}{self.EM_DASH}{content}"
 
+                sentence = self._get_sentence_context(line, match)
+                converted_sentence = sentence.replace(match.group(0), result, 1)
                 self.logger.log_change(
                     self.current_line,
+                    sentence,
+                    converted_sentence,
+                    "D1: Diálogo adicional en línea",
                     match.group(0),
                     result,
-                    "D1: Diálogo adicional en línea",
+                    full_text=original,
+                    full_converted=converted_sentence,
                 )
                 return result
 
             # Si no parece diálogo, no tocar
             return match.group(0)
 
-        # Solo aplicar si la línea ya tiene rayas (indica que estamos en contexto de diálogos)
+        # Solo aplicar si la línea ya tiene rayas (indica
+        # que estamos en contexto de diálogos)
         if self.EM_DASH in new_line:
             new_line = pattern_additional.sub(replace_additional, new_line)
 
@@ -562,7 +668,8 @@ class DialogConverter:
                 re.IGNORECASE,
             ):
                 # Es continuación de diálogo, NO cita interna
-                # Ya debería haberse procesado en _convert_dialog_with_tag, pero por las dudas
+                # Ya debería haberse procesado en
+                # _convert_dialog_with_tag, pero por las dudas
                 return line
 
         # 3. Comillas después de narración con mayúscula (nuevo diálogo)
@@ -572,7 +679,8 @@ class DialogConverter:
 
         # 4. Múltiples diálogos en la misma línea separados por espacio
         # Ejemplo: "Texto1" "Texto2"
-        # Contar comillas: si hay más de 2 pares, probablemente son diálogos consecutivos
+        # Contar comillas: si hay más de 2 pares,
+        # probablemente son diálogos consecutivos
         quote_count = len(re.findall(self.QUOTES_PATTERN, line))
         if quote_count >= 4:  # 2 o más pares de comillas
             return line
@@ -589,11 +697,17 @@ class DialogConverter:
             content = match.group(1)
             result = f"«{content}»"
 
+            sentence = self._get_sentence_context(line, match)
+            converted_sentence = sentence.replace(match.group(0), result, 1)
             self.logger.log_change(
                 self.current_line,
+                sentence,
+                converted_sentence,
+                "D5: Cita interna con comillas latinas",
                 match.group(0),
                 result,
-                "D5: Cita interna con comillas latinas",
+                full_text=original,
+                full_converted=converted_sentence,
             )
             return result
 
