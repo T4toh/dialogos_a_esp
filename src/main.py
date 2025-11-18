@@ -47,7 +47,10 @@ Para más información, ver README.md
         "-o",
         "--output",
         type=str,
-        help="Archivo o carpeta de salida (default: _convertido o subcarpeta convertidos/)",
+        help=(
+            "Archivo o carpeta de salida (default: _convertido "
+            "o subcarpeta convertidos/)"
+        ),
     )
 
     parser.add_argument(

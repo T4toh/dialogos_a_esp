@@ -1,6 +1,6 @@
 import unittest
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
 from src.odt_handler import ODTProcessor
@@ -38,7 +38,9 @@ class TestProblematicParagraphs(unittest.TestCase):
                     paras.append(elem)
 
         if not paras:
-            self.skipTest("No se hallaron párrafos con más de 8 spans en el ODT de ejemplo")
+            self.skipTest(
+                "No se hallaron párrafos con más de 8 spans en el ODT de ejemplo"
+            )
 
         # Tomar hasta 5 párrafos problemáticos
         paras = paras[:5]
@@ -71,7 +73,12 @@ class TestProblematicParagraphs(unittest.TestCase):
 
             # Reconstruir: usamos los mismos segmentos (sin cambios de texto) para
             # verificar que la reconstrucción no aumente la fragmentación.
-            proc._rebuild_with_format_map(p_copy, segments, fmt_map, token_styles_seq=token_styles_seq)
+            proc._rebuild_with_format_map(
+                p_copy,
+                segments,
+                fmt_map,
+                token_styles_seq=token_styles_seq,
+            )
 
             after_spans = len(p_copy.findall(f".//{self.ns_text}span"))
 
@@ -79,7 +86,10 @@ class TestProblematicParagraphs(unittest.TestCase):
             self.assertLessEqual(
                 after_spans,
                 before_spans,
-                msg=f"La reconstrucción aumentó spans: antes={before_spans} despues={after_spans}",
+                msg=(
+                    f"La reconstrucción aumentó spans: antes={before_spans} "
+                    f"despues={after_spans}"
+                ),
             )
 
 

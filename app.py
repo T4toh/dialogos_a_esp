@@ -669,7 +669,8 @@ def main():
                 # Estado previo según selected_files
                 was_selected = file_info["path"] in st.session_state.selected_files
 
-                # Crear checkbox sin pasar 'value' si ya existe la clave en session_state
+                # Crear checkbox sin pasar 'value' si ya existe la clave
+                # en session_state
                 if key in st.session_state:
                     is_selected = st.checkbox(
                         "Seleccionar", key=key, label_visibility="collapsed"
@@ -797,6 +798,22 @@ def process_files(selected_files: set, output_dir: Path):
             with open(log_file, "w", encoding="utf-8") as f:
                 f.write(log_content)
 
+            # Guardar also a structured JSON log for easier programmatic inspection
+            # Prepare a variable for the structured JSON log path; keep it
+            # initialized so linters / type-checkers don't complain about
+            # possibly unbound local variables.
+            json_file_path = None
+
+            try:
+                json_log_file = output_dir / f"{file_path.stem}_convertido.log.json"
+                # converter.logger may not exist for non-ODT flows; guard before saving
+                if hasattr(converter, "logger") and converter.logger.changes:
+                    converter.logger.save_structured_log(json_log_file)
+                    json_file_path = json_log_file
+            except Exception:
+                # Non-critical: ignore failures saving structured log
+                pass
+
             results.append(
                 {
                     "file": file_path.name,
@@ -804,6 +821,7 @@ def process_files(selected_files: set, output_dir: Path):
                     "changes": len(converter.logger.changes),
                     "output": output_file,
                     "log_file": log_file,
+                    "json_log": str(json_file_path) if json_file_path else None,
                 }
             )
 
@@ -875,7 +893,41 @@ def display_results(results: List[Dict], output_dir: Path):
                 log_file = result.get("log_file")
 
                 if log_file and Path(log_file).exists():
-                    # Leer contenido del log
+                    # Prefer structured JSON log when available
+                    json_log_path = None
+                    if result.get("json_log"):
+                        try:
+                            json_log_str = result.get("json_log")
+                            if json_log_str:
+                                json_log_path = Path(json_log_str)
+                            else:
+                                json_log_path = None
+                        except Exception:
+                            json_log_path = None
+                    else:
+                        # fallback: replace .log.txt with .log.json if present
+                        try:
+                            candidate = str(log_file)
+                            if candidate.endswith(".log.txt"):
+                                candidate_json = (
+                                    candidate[: -len(".log.txt")] + ".log.json"
+                                )
+                                json_log_path = Path(candidate_json)
+                        except Exception:
+                            json_log_path = None
+
+                    if json_log_path and json_log_path.exists():
+                        try:
+                            structured = json_log_path.read_text(encoding="utf-8")
+                            import json as _json
+
+                            entries = _json.loads(structured)
+                        except Exception:
+                            entries = None
+                    else:
+                        entries = None
+
+                    # Leer contenido del textual log for fallback
                     current_log_content = Path(log_file).read_text(encoding="utf-8")
 
                     # Opciones de visualización (keys únicas por archivo)
@@ -904,54 +956,168 @@ def display_results(results: List[Dict], output_dir: Path):
                             key=f"download_{file_key}",
                         )
 
+                    # Opciones adicionales de visualización
+                    col4, col5 = st.columns([1, 2])
+                    with col4:
+                        show_diff_raw = st.checkbox(
+                            "Mostrar diff crudo",
+                            value=False,
+                            key=f"showdiffraw_{file_key}",
+                        )
+                    with col5:
+                        inline_highlight = st.checkbox(
+                            "Resaltar cambios inline",
+                            value=True,
+                            key=f"inline_{file_key}",
+                        )
+
                     # Parsear cambios del log (scope local para este archivo)
-                    def parse_and_display_log(log_text, show_all, max_to_show):
-                        """Parse y muestra cambios - función local para aislar scope."""
+                    def build_inline_diff_html(a: str, b: str) -> str:
+                        import difflib
+
+                        theme = st.session_state.get("theme", "dark")
+                        if theme == "dark":
+                            orig_color = "#ffdede"
+                            conv_color = "#d9ffdf"
+                        else:
+                            orig_color = "#721c24"
+                            conv_color = "#0b4118"
+
+                        a_words = [w for w in a.split()]
+                        b_words = [w for w in b.split()]
+                        matcher = difflib.SequenceMatcher(None, a_words, b_words)
+                        parts = []
+
+                        def _make_span(text, bg, color, strike=False):
+                            style_parts = [f"background:{bg};", f"color:{color};"]
+                            if strike:
+                                style_parts.append("text-decoration:line-through;")
+                            style_parts.append("padding:2px;")
+                            style_parts.append("border-radius:3px;")
+                            style_parts.append("margin-right:2px;")
+                            style = "".join(style_parts)
+                            return f"<span style='{style}'>{text}</span>"
+
+                        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                            if tag == "equal":
+                                parts.append(" ".join(a_words[i1:i2]))
+                            elif tag == "replace":
+                                removed = " ".join(a_words[i1:i2])
+                                added = " ".join(b_words[j1:j2])
+                                if removed:
+                                    parts.append(
+                                        _make_span(
+                                            removed,
+                                            "#4b0f0f",
+                                            orig_color,
+                                            True,
+                                        )
+                                    )
+                                if added:
+                                    parts.append(
+                                        _make_span(
+                                            added,
+                                            "#143e19",
+                                            conv_color,
+                                        )
+                                    )
+                            elif tag == "delete":
+                                removed = " ".join(a_words[i1:i2])
+                                parts.append(
+                                    _make_span(removed, "#4b0f0f", orig_color, True)
+                                )
+                            elif tag == "insert":
+                                added = " ".join(b_words[j1:j2])
+                                parts.append(
+                                    _make_span(
+                                        added,
+                                        "#143e19",
+                                        conv_color,
+                                    )
+                                )
+                        return (
+                            '<div style="white-space:pre-wrap;font-family:monospace;">'
+                            + " ".join(parts)
+                            + "</div>"
+                        )
+
+                    def parse_and_display_log(
+                        log_text,
+                        show_all,
+                        max_to_show,
+                        show_diff_raw=False,
+                        inline_highlight=True,
+                    ):
+                        """Parse y muestra cambios - función local para aislar scope.
+
+                        Ahora captura bloques completos (preserva saltos de línea)
+                        y muestra un diff unificado cuando esté disponible.
+                        """
                         all_changes_local = []
                         current_change_local = None
+                        section = None
 
-                        for line in log_text.split("\n"):
-                            if line.startswith("CAMBIO #"):
+                        for raw in log_text.splitlines():
+                            # Detectar inicio de cambio
+                            if raw.startswith("CAMBIO #"):
                                 if current_change_local:
                                     all_changes_local.append(current_change_local)
                                 current_change_local = {
-                                    "numero": line.strip(),
+                                    "numero": raw.strip(),
                                     "ubicacion": "",
                                     "regla": "",
                                     "original": [],
                                     "convertido": [],
-                                    "section": None,
+                                    "diff": [],
                                 }
-                            elif current_change_local:
-                                line_stripped = line.strip()
-                                if line_stripped.startswith("Línea:"):
-                                    current_change_local["ubicacion"] = (
-                                        line_stripped.replace("Línea:", "").strip()
-                                    )
-                                elif line_stripped.startswith("Regla:"):
-                                    current_change_local["regla"] = (
-                                        line_stripped.replace("Regla:", "").strip()
-                                    )
-                                elif line_stripped == "ORIGINAL:":
-                                    current_change_local["section"] = "original"
-                                elif line_stripped == "CONVERTIDO:":
-                                    current_change_local["section"] = "convertido"
-                                elif line.startswith("---"):
-                                    continue
-                                elif (
-                                    current_change_local["section"] == "original"
-                                    and line_stripped
-                                ):
-                                    current_change_local["original"].append(
-                                        line_stripped
-                                    )
-                                elif (
-                                    current_change_local["section"] == "convertido"
-                                    and line_stripped
-                                ):
-                                    current_change_local["convertido"].append(
-                                        line_stripped
-                                    )
+                                section = None
+                                continue
+
+                            if current_change_local is None:
+                                continue
+
+                            stripped = raw.strip()
+                            if stripped.startswith("Línea:"):
+                                current_change_local["ubicacion"] = stripped.replace(
+                                    "Línea:", ""
+                                ).strip()
+                                continue
+                            if stripped.startswith("Regla:"):
+                                current_change_local["regla"] = stripped.replace(
+                                    "Regla:", ""
+                                ).strip()
+                                continue
+
+                            if stripped == "ORIGINAL:":
+                                section = "original"
+                                continue
+                            if stripped == "CONVERTIDO:":
+                                section = "convertido"
+                                continue
+                            if stripped == "DIFF (unified):":
+                                section = "diff"
+                                continue
+
+                            # Separator line - finalize current change
+                            if stripped.startswith("-----"):
+                                if current_change_local:
+                                    all_changes_local.append(current_change_local)
+                                    current_change_local = None
+                                section = None
+                                continue
+
+                            # Según la sección actual, agregar la línea
+                            # (preservando saltos)
+                            if section == "original":
+                                # Quitar prefijo de dos espacios que el logger añade
+                                line_content = raw[2:] if raw.startswith("  ") else raw
+                                current_change_local["original"].append(line_content)
+                            elif section == "convertido":
+                                line_content = raw[2:] if raw.startswith("  ") else raw
+                                current_change_local["convertido"].append(line_content)
+                            elif section == "diff":
+                                line_content = raw[2:] if raw.startswith("  ") else raw
+                                current_change_local["diff"].append(line_content)
 
                         if current_change_local:
                             all_changes_local.append(current_change_local)
@@ -963,36 +1129,429 @@ def display_results(results: List[Dict], output_dir: Path):
                             else all_changes_local[:max_to_show]
                         )
                         st.markdown(
-                            f"**Mostrando {len(changes_to_show_local)} de {len(all_changes_local)} cambios**"
+                            "**Mostrando "
+                            + f"{len(changes_to_show_local)}"
+                            + f" de {len(all_changes_local)} cambios**"
                         )
 
                         for change in changes_to_show_local:
                             with st.container():
                                 orig_text = (
-                                    " ".join(change["original"])
+                                    "\n".join(change["original"]).strip()
                                     if change["original"]
                                     else "N/A"
                                 )
                                 conv_text = (
-                                    " ".join(change["convertido"])
+                                    "\n".join(change["convertido"]).strip()
                                     if change["convertido"]
                                     else "N/A"
+                                )
+                                diff_text = (
+                                    "\n".join(change["diff"]).strip()
+                                    if change["diff"]
+                                    else None
                                 )
 
                                 st.markdown(f"**{change['numero']}**")
                                 st.markdown(
                                     f"*Línea {change['ubicacion']} • {change['regla']}*"
                                 )
-                                st.markdown("**Original:**")
-                                st.code(orig_text, language=None)
-                                st.markdown("**Convertido:**")
-                                st.code(conv_text, language=None)
+
+                                # Paleta dependiente del tema
+                                theme = st.session_state.get("theme", "dark")
+                                if theme == "dark":
+                                    orig_bg = "#3b2626"
+                                    conv_bg = "#12321a"
+                                    orig_color = "#ffdede"
+                                    conv_color = "#d9ffdf"
+                                else:
+                                    orig_bg = "#fff5f5"
+                                    conv_bg = "#f0fff4"
+                                    orig_color = "#721c24"
+                                    conv_color = "#0b4118"
+
+                                orig_block = orig_text
+                                conv_block = conv_text
+
+                                # Inline highlight helper (word-level)
+                                def build_inline_diff_html(a: str, b: str) -> str:
+                                    import difflib
+
+                                    def _make_span(text, bg, color, strike=False):
+                                        style_parts = [
+                                            f"background:{bg};",
+                                            f"color:{color};",
+                                        ]
+                                        if strike:
+                                            style_parts.append(
+                                                "text-decoration:line-through;"
+                                            )
+                                        style_parts.append("padding:2px;")
+                                        style_parts.append("border-radius:3px;")
+                                        style_parts.append("margin-right:2px;")
+                                        style = "".join(style_parts)
+                                        return f"<span style='{style}'>{text}</span>"
+
+                                    a_words = [w for w in a.split()]
+                                    b_words = [w for w in b.split()]
+                                    matcher = difflib.SequenceMatcher(
+                                        None, a_words, b_words
+                                    )
+                                    parts = []
+                                    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                                        if tag == "equal":
+                                            parts.append(" ".join(a_words[i1:i2]))
+                                        elif tag == "replace":
+                                            removed = " ".join(a_words[i1:i2])
+                                            added = " ".join(b_words[j1:j2])
+                                            if removed:
+                                                parts.append(
+                                                    _make_span(
+                                                        removed,
+                                                        "#4b0f0f",
+                                                        orig_color,
+                                                        True,
+                                                    )
+                                                )
+                                            if added:
+                                                parts.append(
+                                                    _make_span(
+                                                        added,
+                                                        "#143e19",
+                                                        conv_color,
+                                                    )
+                                                )
+                                        elif tag == "delete":
+                                            removed = " ".join(a_words[i1:i2])
+                                            parts.append(
+                                                _make_span(
+                                                    removed, "#4b0f0f", orig_color, True
+                                                )
+                                            )
+                                        elif tag == "insert":
+                                            added = " ".join(b_words[j1:j2])
+                                            parts.append(
+                                                _make_span(
+                                                    added,
+                                                    "#143e19",
+                                                    conv_color,
+                                                )
+                                            )
+                                    return (
+                                        '<div style="white-space:pre-wrap;'
+                                        'font-family:monospace;">'
+                                        + " ".join(parts)
+                                        + "</div>"
+                                    )
+
+                                if inline_highlight:
+                                    try:
+                                        inline_html = build_inline_diff_html(
+                                            orig_block, conv_block
+                                        )
+                                        inline_title = (
+                                            "<div style='margin-bottom:6px'>"
+                                            "<strong>Inline diff:</strong></div>"
+                                        )
+                                        st.markdown(
+                                            inline_title + inline_html,
+                                            unsafe_allow_html=True,
+                                        )
+                                        # Also show the full original/converted blocks
+                                        # below
+                                        # for context
+                                        orig_style = (
+                                            f"<div style='background:{orig_bg};"
+                                            f"color:{orig_color};"
+                                            "border-radius:6px;padding:10px;white-space:pre-wrap;"
+                                            "font-family:monospace;'><strong>Original:</strong>\n"
+                                        )
+                                        orig_html = orig_style + orig_block + "</div>"
+                                        st.markdown(orig_html, unsafe_allow_html=True)
+                                        conv_style = (
+                                            f"<div style='background:{conv_bg};"
+                                            f"color:{conv_color};"
+                                            "border-radius:6px;padding:10px;white-space:pre-wrap;"
+                                            "font-family:monospace;'><strong>Convertido:</strong>\n"
+                                        )
+                                        conv_html = conv_style + conv_block + "</div>"
+                                        st.markdown(conv_html, unsafe_allow_html=True)
+                                    except Exception:
+                                        st.markdown(
+                                            (
+                                                f"<div style='background:{orig_bg};"
+                                                f"color:{orig_color};"
+                                                "border-radius:6px;padding:10px;white-space:pre-wrap;"
+                                                "font-family:monospace;'>"
+                                                f"<strong>Original:</strong>\n{orig_block}</div>"
+                                            ),
+                                            unsafe_allow_html=True,
+                                        )
+                                        st.markdown(
+                                            (
+                                                f"<div style='background:{conv_bg};"
+                                                f"color:{conv_color};"
+                                                "border-radius:6px;padding:10px;white-space:pre-wrap;"
+                                                "font-family:monospace;'>"
+                                                f"<strong>Convertido:</strong>\n{conv_block}</div>"
+                                            ),
+                                            unsafe_allow_html=True,
+                                        )
+                                else:
+                                    st.markdown(
+                                        (
+                                            f"<div style='background:{orig_bg};"
+                                            f"color:{orig_color};"
+                                            "border-radius:6px;padding:10px;white-space:pre-wrap;"
+                                            "font-family:monospace;'><strong>Original:</strong>\n"
+                                            + orig_block
+                                            + "</div>"
+                                        ),
+                                        unsafe_allow_html=True,
+                                    )
+                                    st.markdown(
+                                        (
+                                            f"<div style='background:{conv_bg};"
+                                            f"color:{conv_color};"
+                                            "border-radius:6px;padding:10px;white-space:pre-wrap;"
+                                            "font-family:monospace;'><strong>Convertido:</strong>\n"
+                                            + conv_block
+                                            + "</div>"
+                                        ),
+                                        unsafe_allow_html=True,
+                                    )
+
+                                # Mostrar diff unificado solo si el usuario lo pidió
+                                if diff_text and show_diff_raw:
+                                    st.markdown("**Diff (unified):**")
+                                    st.code(diff_text, language="diff")
+
                                 st.markdown("---")
 
                         return len(all_changes_local)
 
-                    # Llamar a la función
-                    parse_and_display_log(current_log_content, show_full, max_changes)
+                    # If we have structured entries prefer them
+                    # (use precise spans if available)
+                    def build_inline_html_from_spans(
+                        orig: str, conv: str, orig_span, conv_span, theme="dark"
+                    ) -> str:
+                        import html as _html
+
+                        # Colors depending on theme
+                        if theme == "dark":
+                            orig_color = "#ffdede"
+                            conv_color = "#d9ffdf"
+                            del_bg = "#4b0f0f"
+                            ins_bg = "#143e19"
+                        else:
+                            orig_color = "#721c24"
+                            conv_color = "#0b4118"
+                            del_bg = "#f8d7da"
+                            ins_bg = "#d4edda"
+
+                        # If spans available, wrap exact substrings
+                        # Support one-sided spans (only original or only converted)
+                        if orig_span and conv_span:
+                            ostart, oend = orig_span
+                            cstart, cend = conv_span
+
+                            before_o = _html.escape(orig[:ostart])
+                            frag_o = _html.escape(orig[ostart:oend])
+                            after_o = _html.escape(orig[oend:])
+
+                            before_c = _html.escape(conv[:cstart])
+                            frag_c = _html.escape(conv[cstart:cend])
+                            after_c = _html.escape(conv[cend:])
+
+                            parts = []
+                            # Original with deletion highlight
+                            orig_template = (
+                                "<div style='background:transparent;"
+                                "color:{color};"
+                                ""
+                                "white-space:pre-wrap;font-family:monospace;'>"
+                                "<strong>Original:</strong><br>"
+                                "{before}<span style='background:{del_bg};"
+                                "color:{color};text-decoration:line-through;"
+                                "padding:2px;border-radius:3px;'>{frag}</span>"
+                                "{after}</div>"
+                            )
+                            parts.append(
+                                orig_template.format(
+                                    color=orig_color,
+                                    before=before_o,
+                                    frag=frag_o,
+                                    del_bg=del_bg,
+                                    after=after_o,
+                                )
+                            )
+                            # Converted with insertion highlight
+                            conv_template = (
+                                "<div style='background:transparent;color:{color};"
+                                "white-space:pre-wrap;font-family:monospace;'>"
+                                "<strong>Convertido:</strong><br>"
+                                "{before}<span style='background:{ins_bg};"
+                                "color:{color};padding:2px;border-radius:3px;'>{frag}</span>{after}</div>"
+                            )
+                            parts.append(
+                                conv_template.format(
+                                    color=conv_color,
+                                    before=before_c,
+                                    frag=frag_c,
+                                    ins_bg=ins_bg,
+                                    after=after_c,
+                                )
+                            )
+
+                            return (
+                                "<div style='margin-bottom:6px'>"
+                                + "".join(parts)
+                                + "</div>"
+                            )
+
+                        # If one side only is present, highlight that side
+                        # and show the other block
+                        elif orig_span or conv_span:
+                            ostart = oend = cstart = cend = None
+                            # default empty values so static analysis
+                            # knows they are defined
+                            before_c = frag_c = after_c = ""
+                            if orig_span:
+                                ostart, oend = orig_span
+                            if conv_span:
+                                cstart, cend = conv_span
+
+                            parts = []
+                            if orig_span:
+                                before_o = _html.escape(orig[:ostart])
+                                frag_o = _html.escape(orig[ostart:oend])
+                                after_o = _html.escape(orig[oend:])
+                                parts.append(
+                                    (
+                                        "<div style='background:transparent;'"
+                                        "color:{color};"
+                                        "white-space:pre-wrap;font-family:monospace;'>"
+                                        "<strong>Original:</strong><br>"
+                                        "{before}<span style='background:{del_bg};"
+                                        "color:{color};text-decoration:line-through;"
+                                        "padding:2px;border-radius:3px;'>{frag}</span>"
+                                        "{after}</div>"
+                                    ).format(
+                                        color=orig_color,
+                                        before=before_o,
+                                        frag=frag_o,
+                                        del_bg=del_bg,
+                                        after=after_o,
+                                    )
+                                )
+
+                            if conv_span:
+                                before_c = _html.escape(conv[:cstart])
+                                frag_c = _html.escape(conv[cstart:cend])
+                                after_c = _html.escape(conv[cend:])
+                            conv_template = (
+                                "<div style='background:transparent;"
+                                "color:{color};"
+                                "white-space:pre-wrap;font-family:monospace;'>"
+                                "<strong>Convertido:</strong><br>"
+                                "{before}<span style='background:{ins_bg};"
+                                "color:{color};padding:2px;border-radius:3px;'>{frag}</span>{after}</div>"
+                            )
+                            if conv_span:
+                                parts.append(
+                                    conv_template.format(
+                                        color=conv_color,
+                                        before=before_c,
+                                        frag=frag_c,
+                                        ins_bg=ins_bg,
+                                        after=after_c,
+                                    )
+                                )
+
+                            return (
+                                "<div style='margin-bottom:6px'>"
+                                + "".join(parts)
+                                + "</div>"
+                            )
+
+                        # Fallback to word-level diff
+                        try:
+                            return build_inline_diff_html(orig, conv)
+                        except Exception:
+                            return (
+                                "<div><pre>"
+                                + _html.escape(orig)
+                                + "\n---\n"
+                                + _html.escape(conv)
+                                + "</pre></div>"
+                            )
+
+                    # If we have structured entries, render them
+                    if entries is not None:
+                        st.markdown(
+                            "**Mostrando "
+                            + (
+                                f"{min(len(entries), max_changes)}"
+                                if not show_full
+                                else f"{len(entries)}"
+                            )
+                            + f" de {len(entries)} cambios (JSON)**"
+                        )
+                        display_list = entries if show_full else entries[:max_changes]
+                        for idx_e, entry in enumerate(display_list, 1):
+                            with st.container():
+                                st.markdown(f"**CAMBIO #{idx_e}**")
+                                st.markdown(
+                                    "*Línea ~"
+                                    + str(entry.get("line"))
+                                    + " • "
+                                    + str(entry.get("rule"))
+                                    + "*"
+                                )
+
+                                orig_text = entry.get("original", "")
+                                conv_text = entry.get("converted", "")
+                                orig_span = entry.get("original_span")
+                                conv_span = entry.get("converted_span")
+
+                                theme = st.session_state.get("theme", "dark")
+                                inline_html = build_inline_html_from_spans(
+                                    orig_text, conv_text, orig_span, conv_span, theme
+                                )
+                                # Mostrar la fuente de los spans (útil para depuración)
+                                span_source_line = ""
+                                if entry.get("original_span_source") or entry.get(
+                                    "converted_span_source"
+                                ):
+                                    span_source_line = (
+                                        "(span: orig="
+                                        + str(entry.get("original_span_source"))
+                                        + ", conv="
+                                        + str(entry.get("converted_span_source"))
+                                        + ")"
+                                    )
+                                    st.markdown(
+                                        "<small style='color:gray'>"
+                                        + span_source_line
+                                        + "</small>",
+                                        unsafe_allow_html=True,
+                                    )
+                                st.markdown(inline_html, unsafe_allow_html=True)
+
+                                if entry.get("diff") and show_diff_raw:
+                                    st.markdown("**Diff (unified):**")
+                                    st.code(entry.get("diff"), language="diff")
+
+                                st.markdown("---")
+                    else:
+                        # Fallback to the legacy textual parser
+                        parse_and_display_log(
+                            current_log_content,
+                            show_full,
+                            max_changes,
+                            show_diff_raw,
+                            inline_highlight,
+                        )
 
                     # Estadísticas de reglas
                     rules_count = {}

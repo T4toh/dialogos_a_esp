@@ -45,7 +45,8 @@ class ODTProcessor:
 
         Args:
             output_path: Ruta de salida
-            text_converter_func: Función que convierte el texto (recibe str, retorna tuple[str, logger])
+            text_converter_func: Función que convierte el texto. Recibe str y
+                retorna tuple[str, logger]
         """
         try:
             with zipfile.ZipFile(self.filepath, "r") as input_zip:
@@ -245,7 +246,8 @@ class ODTProcessor:
             else:
                 converted_segments.append(seg)
 
-        # 4. Reconstruir preservando formato: preferir estilos por índice (token_styles_seq)
+        # 4. Reconstruir preservando formato: preferir estilos por índice
+        # (token_styles_seq)
         #    y usar format_map consumiendo entradas (pop) como fallback.
         # Pasar además los segmentos originales para permitir alineado token->token
         self._rebuild_with_format_map(
@@ -416,7 +418,8 @@ class ODTProcessor:
                     # Guardar char style snapshot
                     # Convertir current_char_styles a lista y añadir a auxiliar
                     # (almacenaremos el arreglo en paralelo en otra lista)
-                    # Para simplificar, almacenamos temporalmente en segments_token_styles[-1]
+                    # Para simplificar, almacenamos temporalmente en
+                    # segments_token_styles[-1]
                     segments_token_styles[-1] = current_char_styles.copy()
 
                     # Limpiar acumuladores para el siguiente segmento
@@ -640,7 +643,8 @@ class ODTProcessor:
         # Procesar cada segmento
         for seg_idx, segment_text in enumerate(segments):
             if seg_idx > 0:
-                # Añadir line-break entre segmentos (se añade automáticamente al elemento)
+                # Añadir line-break entre segmentos
+                # (se añade automáticamente al elemento)
                 ET.SubElement(element, f"{ns_text}line-break")
 
             # Dividir el segmento en tokens (palabras y espacios)
@@ -695,7 +699,8 @@ class ODTProcessor:
                 styles_for_tokens = [None for _ in range(len(words))]
 
             # Para tokens, aplicar FORCED NORMALIZATION para marcadores de diálogo
-            # y luego, si no hay estilo asignado, intentar consumir del mapa por palabra.
+            # y luego, si no hay estilo asignado,
+            # intentar consumir del mapa por palabra.
             for i, token in enumerate(words):
                 token_stripped = token.strip()
 
@@ -1045,7 +1050,9 @@ class ODTWriter:
         # manifest.xml
         manifest = """<?xml version="1.0" encoding="UTF-8"?>
 <manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
-  <manifest:file-entry manifest:media-type="application/vnd.oasis.opendocument.text" manifest:full-path="/"/>
+    <manifest:file-entry
+        manifest:media-type="application/vnd.oasis.opendocument.text"
+        manifest:full-path="/"/>
   <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="content.xml"/>
   <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="styles.xml"/>
   <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="meta.xml"/>
