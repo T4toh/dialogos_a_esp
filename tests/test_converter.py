@@ -305,10 +305,43 @@ class TestDialogConverter(unittest.TestCase):
 
     def test_plural_dialog_tags(self):
         """Test: Verbos de diálogo en plural."""
-        input_text = '"¿De verdad?" Dijeron al unísono.'
-        expected = "—¿De verdad? —dijeron al unísono."
-        result, _ = self.converter.convert(input_text)
-        self.assertEqual(result, expected)
+        text = '"Hola" dijeron los niños.'
+        result, _ = self.converter.convert(text)
+        self.assertEqual(result, "—Hola —dijeron los niños.")
+
+    def test_missing_space_before_dialog_tag_with_period(self):
+        """Test: Falta espacio antes de verbo con punto."""
+        text = '"Se mudaron hace poco."Dijo sonriente Yiri.'
+        result, _ = self.converter.convert(text)
+        self.assertEqual(result, "—Se mudaron hace poco —dijo sonriente Yiri.")
+
+    def test_missing_space_before_dialog_tag_with_comma(self):
+        """Test: Falta espacio antes de verbo con coma."""
+        text = '"Hola",Dijo Juan.'
+        result, _ = self.converter.convert(text)
+        self.assertEqual(result, "—Hola —dijo Juan.")
+
+    def test_missing_space_before_dialog_tag_no_punctuation(self):
+        """Test: Falta espacio antes de verbo sin puntuación."""
+        text = '"Hola"Dijo Juan.'
+        result, _ = self.converter.convert(text)
+        self.assertEqual(result, "—Hola —dijo Juan.")
+
+    def test_missing_space_multiple_cases(self):
+        """Test: Múltiples casos de espacios faltantes."""
+        text = '"Yo conozco mejor a mi hermanito."Dijo divertida Amelia.'
+        result, _ = self.converter.convert(text)
+        self.assertEqual(
+            result, "—Yo conozco mejor a mi hermanito —dijo divertida Amelia."
+        )
+
+    def test_missing_space_not_dialog_tag(self):
+        """Test: No insertar espacio si no es verbo de dicción."""
+        # "Texto"Palabra donde Palabra NO es verbo de dicción
+        text = '"Hola"Mundo'
+        result, _ = self.converter.convert(text)
+        # No debería cambiar porque "Mundo" no es verbo de dicción
+        self.assertEqual(result, '—Hola"Mundo')
 
 
 if __name__ == "__main__":

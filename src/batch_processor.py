@@ -2,11 +2,12 @@
 Procesador de lotes para múltiples archivos.
 """
 
+import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from .converter import DialogConverter
-from .odt_handler import is_odt_file, ODTProcessor
+from .odt_handler import ODTProcessor, is_odt_file
 
 
 class BatchProcessor:
@@ -66,6 +67,12 @@ class BatchProcessor:
                 output_file = (
                     output_dir / f"{file_path.stem}_convertido{file_path.suffix}"
                 )
+
+                # Copiar archivo original PRIMERO, antes de procesar
+                original_copy = (
+                    output_dir / f"{file_path.stem}_original{file_path.suffix}"
+                )
+                shutil.copy2(file_path, original_copy)
 
                 # Procesar según tipo
                 if is_odt_file(file_path):
