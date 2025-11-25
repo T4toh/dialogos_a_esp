@@ -3,6 +3,7 @@ Utilidades para manejo de archivos y directorios.
 Funciones extraídas de app.py para mejor organización.
 """
 
+import re
 from pathlib import Path
 from typing import Dict, List
 
@@ -53,7 +54,14 @@ def scan_directory(
                     }
                 )
 
-    return sorted(files_info, key=lambda x: x["name"])
+    def natural_sort_key(s):
+        """Clave de ordenamiento natural para strings con números."""
+        return [
+            int(text) if text.isdigit() else text.lower()
+            for text in re.split(r"(\d+)", s["name"])
+        ]
+
+    return sorted(files_info, key=natural_sort_key)
 
 
 def format_size(size_bytes: int) -> str:

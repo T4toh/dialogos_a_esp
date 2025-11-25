@@ -70,7 +70,7 @@ def render_sidebar() -> dict:
         file_filter = st.selectbox(
             "Tipo de archivo",
             options=["Todos (*.*)", "Solo ODT (*.odt)", "Solo TXT (*.txt)"],
-            index=0,
+            index=1,
         )
 
         recursive = st.checkbox(

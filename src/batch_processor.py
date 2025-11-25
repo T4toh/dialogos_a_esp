@@ -4,7 +4,7 @@ Procesador de lotes para múltiples archivos.
 
 import shutil
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from .converter import DialogConverter
 from .odt_handler import ODTProcessor, is_odt_file
@@ -54,10 +54,45 @@ class BatchProcessor:
         print(f"Salida: {output_dir}\n")
 
         # Procesar archivos
+        results = self.process_files(
+            files, output_dir, progress_callback=self._show_progress
+        )
+
+        # Limpiar línea de progreso
+        print()  # Nueva línea después de la barra
+
+        # Generar resumen
+        self._show_summary(results, output_dir)
+
+        return {
+            "success": True,
+            "files_processed": len([r for r in results if r["success"]]),
+            "total_files": len(files),
+            "results": results,
+        }
+
+    def process_files(
+        self,
+        files: List[Path],
+        output_dir: Path,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> List[Dict]:
+        """
+        Procesa una lista de archivos.
+
+        Args:
+            files: Lista de archivos a procesar
+            output_dir: Carpeta de salida
+            progress_callback: Función de callback para progreso (current, total, filename)
+
+        Returns:
+            Lista de resultados
+        """
         results = []
 
         for idx, file_path in enumerate(files, 1):
-            self._show_progress(idx, len(files), file_path.name)
+            if progress_callback:
+                progress_callback(idx, len(files), file_path.name)
 
             try:
                 # CREAR NUEVO CONVERTIDOR POR CADA ARCHIVO
@@ -67,12 +102,6 @@ class BatchProcessor:
                 output_file = (
                     output_dir / f"{file_path.stem}_convertido{file_path.suffix}"
                 )
-
-                # Copiar archivo original PRIMERO, antes de procesar
-                original_copy = (
-                    output_dir / f"{file_path.stem}_original{file_path.suffix}"
-                )
-                shutil.copy2(file_path, original_copy)
 
                 # Procesar según tipo
                 if is_odt_file(file_path):
@@ -95,12 +124,31 @@ class BatchProcessor:
                 with open(log_file, "w", encoding="utf-8") as f:
                     f.write(log_content)
 
+                # Copiar archivo original para debug
+                original_copy = (
+                    output_dir / f"{file_path.stem}_original{file_path.suffix}"
+                )
+                shutil.copy2(file_path, original_copy)
+
+                # Guardar log estructurado JSON (si hay cambios)
+                json_log_path = None
+                try:
+                    if converter.logger.changes:
+                        json_log_path = (
+                            output_dir / f"{file_path.stem}_convertido.log.json"
+                        )
+                        converter.logger.save_structured_log(json_log_path)
+                except Exception:
+                    pass
+
                 results.append(
                     {
                         "file": file_path.name,
                         "success": True,
                         "changes": len(converter.logger.changes),
                         "output": output_file,
+                        "log_file": log_file,
+                        "json_log": str(json_log_path) if json_log_path else None,
                     }
                 )
 
@@ -109,18 +157,7 @@ class BatchProcessor:
                     {"file": file_path.name, "success": False, "error": str(e)}
                 )
 
-        # Limpiar línea de progreso
-        print()  # Nueva línea después de la barra
-
-        # Generar resumen
-        self._show_summary(results, output_dir)
-
-        return {
-            "success": True,
-            "files_processed": len([r for r in results if r["success"]]),
-            "total_files": len(files),
-            "results": results,
-        }
+        return results
 
     def find_files(self, directory: Path, pattern: str, recursive: bool) -> List[Path]:
         """
