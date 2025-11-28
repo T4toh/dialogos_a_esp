@@ -61,6 +61,9 @@ class DialogConverter:
         # PASO 0: Normalizar comillas
         text = self._normalize_quotes(text)
 
+        # PASO 1: Normalizar espacios antes de verbos de dicción
+        text = self._normalize_spacing_before_tags(text)
+
         lines = text.split("\n")
         converted_lines = []
 
@@ -104,6 +107,65 @@ class DialogConverter:
         text = text.replace(""", "'").replace(""", "'")
 
         return text
+
+    def _normalize_spacing_before_tags(self, text: str) -> str:
+        """
+        Normaliza espacios faltantes antes de verbos de dicción.
+
+        Corrige: "texto"Verbo → "texto" Verbo
+
+        Args:
+            text: Texto con comillas normalizadas
+
+        Returns:
+            Texto con espacios corregidos
+        """
+        # Patrón: comilla + puntuación opcional + comilla + mayúscula
+        # Detecta casos como: "texto"Dijo, "texto."Dijo, "texto",Dijo
+        # Nota: En este punto las comillas ya están normalizadas a comillas rectas
+        pattern = re.compile(r'"([.,]?)"([A-ZÁÉÍÓÚÑ]\w+)', flags=re.UNICODE)
+
+        # Track changes for logging
+        changes_made = []
+
+        def add_space(match):
+            punct = match.group(1)  # Puntuación opcional (. o ,)
+            word = match.group(2)  # Palabra que sigue
+
+            # Verificar si la palabra es verbo de dicción
+            if is_dialog_tag(word):
+                # Insertar espacio antes del verbo
+                original = match.group(0)
+                result = f'"{punct}" {word}'
+
+                # Track this change
+                changes_made.append(
+                    {"original": original, "converted": result, "word": word}
+                )
+
+                return result
+
+            # No es verbo, dejar como está
+            return match.group(0)
+
+        result_text = pattern.sub(add_space, text)
+
+        # Log the normalization changes
+        if changes_made:
+            # Create a summary log entry for all spacing normalizations
+            for change in changes_made:
+                # Log each normalization change
+                # We use line 0 as a placeholder since this is text-level normalization
+                self.logger.log_change(
+                    line_num=0,
+                    original=change["original"],
+                    converted=change["converted"],
+                    rule="N1: Normalización de espacio antes de verbo de dicción",
+                    original_fragment=change["original"],
+                    converted_fragment=change["converted"],
+                )
+
+        return result_text
 
     def _convert_line(self, line: str) -> str:
         """

@@ -4,6 +4,7 @@ Soporta archivos individuales y procesamiento de carpetas.
 """
 
 import argparse
+import shutil
 import sys
 from pathlib import Path
 
@@ -132,6 +133,12 @@ def process_file(input_path: Path, args):
     try:
         converter = DialogConverter()
 
+        # Copiar archivo original PRIMERO, antes de procesar
+        original_copy_path = (
+            output_path.parent / f"{input_path.stem}_original{input_path.suffix}"
+        )
+        shutil.copy2(input_path, original_copy_path)
+
         if is_odt_file(input_path):
             # ODT
             if not args.quiet:
@@ -182,6 +189,7 @@ def process_file(input_path: Path, args):
             print("Archivos generados:")
             print(f"  - {output_path}")
             print(f"  - {log_path}")
+            print(f"  - {original_copy_path}")
 
         sys.exit(0)
 
