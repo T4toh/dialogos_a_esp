@@ -226,11 +226,11 @@ class DialogConverterGUI:
         
         if folder:
             folder_path = Path(folder)
-            # Buscar archivos .txt y .odt
-            txt_files = list(folder_path.glob("*.txt"))
-            odt_files = list(folder_path.glob("*.odt"))
             
-            new_files = txt_files + odt_files
+            # Usar BatchProcessor para encontrar archivos (reutilizar lógica)
+            converter = DialogConverter()
+            batch = BatchProcessor(converter)
+            new_files = batch.find_files(folder_path, "*.*", recursive=False)
             
             for file_path in new_files:
                 if file_path not in self.selected_files:
