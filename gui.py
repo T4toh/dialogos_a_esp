@@ -228,9 +228,10 @@ class DialogConverterGUI:
             folder_path = Path(folder)
             
             # Usar BatchProcessor para encontrar archivos (reutilizar lógica)
+            # Buscar recursivamente para encontrar archivos en subcarpetas
             converter = DialogConverter()
             batch = BatchProcessor(converter)
-            new_files = batch.find_files(folder_path, "*.*", recursive=False)
+            new_files = batch.find_files(folder_path, "*.*", recursive=True)
             
             for file_path in new_files:
                 if file_path not in self.selected_files:
