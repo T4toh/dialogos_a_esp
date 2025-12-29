@@ -475,10 +475,10 @@ class DialogConverterGUI:
         self.status_var.set(f"✅ Procesamiento completado: {success_count}/{total} archivos")
 
     def _show_log_window(self, log_file: Path, filename: str):
-        """Muestra ventana con el contenido del log."""
+        """Muestra ventana con el contenido del log formateado."""
         log_window = tk.Toplevel(self.root)
         log_window.title(f"Log de conversión - {filename}")
-        log_window.geometry("900x700")
+        log_window.geometry("1000x700")
         
         # Header
         header_frame = ttk.Frame(log_window, padding="10")
@@ -506,7 +506,7 @@ class DialogConverterGUI:
             text_frame,
             wrap=tk.WORD,
             yscrollcommand=vsb.set,
-            font=('Courier', 10),
+            font=('Monospace', 10),
             bg='#f5f5f5',
             fg='#333333',
             padx=10,
@@ -514,12 +514,25 @@ class DialogConverterGUI:
         )
         vsb.config(command=text_widget.yview)
         
-        # Leer y mostrar log
+        # Configurar tags para colores
+        text_widget.tag_config('header', font=('Helvetica', 11, 'bold'), foreground='#2c3e50')
+        text_widget.tag_config('change_num', font=('Monospace', 10, 'bold'), foreground='#2980b9')
+        text_widget.tag_config('location', font=('Monospace', 9), foreground='#7f8c8d')
+        text_widget.tag_config('rule', font=('Monospace', 9, 'italic'), foreground='#8e44ad')
+        text_widget.tag_config('section', font=('Monospace', 10, 'bold'), foreground='#16a085', underline=True)
+        text_widget.tag_config('original', background='#ffe6e6', foreground='#c0392b', font=('Monospace', 10))
+        text_widget.tag_config('converted', background='#e6ffe6', foreground='#27ae60', font=('Monospace', 10))
+        text_widget.tag_config('separator', foreground='#bdc3c7')
+        text_widget.tag_config('summary', font=('Helvetica', 11, 'bold'), foreground='#34495e')
+        text_widget.tag_config('stats', font=('Monospace', 9), foreground='#7f8c8d')
+        
+        # Leer y parsear log
         try:
             with open(log_file, 'r', encoding='utf-8') as f:
                 log_content = f.read()
             
-            text_widget.insert('1.0', log_content)
+            # Parsear y formatear log
+            self._format_log_content(text_widget, log_content)
             text_widget.config(state='disabled')  # Solo lectura
         except Exception as e:
             text_widget.insert('1.0', f"Error al leer el log:\n{str(e)}")
@@ -537,6 +550,88 @@ class DialogConverterGUI:
             text="Cerrar",
             command=log_window.destroy
         ).pack(side=tk.RIGHT)
+
+    def _format_log_content(self, text_widget: tk.Text, log_content: str):
+        """Formatea el contenido del log con colores y estructura."""
+        lines = log_content.split('\n')
+        in_change = False
+        section = None
+        
+        for line in lines:
+            stripped = line.strip()
+            
+            # Header del archivo
+            if stripped.startswith('====='):
+                text_widget.insert(tk.END, line + '\n', 'separator')
+                continue
+            
+            # Resumen
+            if 'RESUMEN' in stripped or 'Total de cambios' in stripped:
+                text_widget.insert(tk.END, line + '\n', 'summary')
+                continue
+            
+            # Estadísticas
+            if any(x in stripped for x in ['Líneas afectadas:', 'Reglas aplicadas:', 'aplicada']):
+                text_widget.insert(tk.END, line + '\n', 'stats')
+                continue
+            
+            # Cambio individual
+            if stripped.startswith('CAMBIO #'):
+                if in_change:
+                    text_widget.insert(tk.END, '\n')
+                text_widget.insert(tk.END, stripped + '\n', 'change_num')
+                in_change = True
+                section = None
+                continue
+            
+            # Ubicación del cambio
+            if stripped.startswith('Línea:'):
+                text_widget.insert(tk.END, '  ' + stripped + '\n', 'location')
+                continue
+            
+            # Regla aplicada
+            if stripped.startswith('Regla:') or stripped.startswith('Regla aplicada:'):
+                text_widget.insert(tk.END, '  ' + stripped + '\n', 'rule')
+                continue
+            
+            # Secciones
+            if stripped == 'ORIGINAL:':
+                text_widget.insert(tk.END, '\n  ' + stripped + '\n', 'section')
+                section = 'original'
+                continue
+            
+            if stripped == 'CONVERTIDO:':
+                text_widget.insert(tk.END, '\n  ' + stripped + '\n', 'section')
+                section = 'converted'
+                continue
+            
+            if stripped.startswith('DIFF'):
+                section = 'diff'
+                text_widget.insert(tk.END, '\n  ' + stripped + '\n', 'section')
+                continue
+            
+            # Separador entre cambios
+            if stripped.startswith('-----'):
+                text_widget.insert(tk.END, line + '\n\n', 'separator')
+                in_change = False
+                section = None
+                continue
+            
+            # Contenido según sección
+            if section == 'original' and line.strip():
+                # Remover indentación inicial
+                content = line[2:] if line.startswith('  ') else line
+                text_widget.insert(tk.END, '    ' + content + '\n', 'original')
+            elif section == 'converted' and line.strip():
+                # Remover indentación inicial
+                content = line[2:] if line.startswith('  ') else line
+                text_widget.insert(tk.END, '    ' + content + '\n', 'converted')
+            elif section == 'diff' and line.strip():
+                # Diff sin colorear especial (ya está en sección)
+                text_widget.insert(tk.END, '    ' + line + '\n')
+            else:
+                # Líneas normales
+                text_widget.insert(tk.END, line + '\n')
 
     def _open_folder(self, folder: Path):
         """Abre carpeta en explorador del sistema."""
