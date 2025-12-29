@@ -148,7 +148,8 @@ class DialogConverterGUI:
             row=0, column=0, sticky=tk.W, padx=(0, 10)
         )
         
-        self.output_var = tk.StringVar(value="./convertidos")
+        # Default: carpeta del primer archivo seleccionado / convertidos
+        self.output_var = tk.StringVar(value="")
         output_entry = ttk.Entry(
             output_frame,
             textvariable=self.output_var,
@@ -216,6 +217,7 @@ class DialogConverterGUI:
                     self.selected_files.append(path)
             
             self._update_files_list()
+            self._update_default_output()
             self.status_var.set(f"✅ {len(self.selected_files)} archivo(s) seleccionado(s)")
 
     def _select_folder(self):
@@ -235,11 +237,20 @@ class DialogConverterGUI:
                     self.selected_files.append(file_path)
             
             self._update_files_list()
+            self._update_default_output()
             
             if new_files:
                 self.status_var.set(f"✅ {len(new_files)} archivo(s) encontrado(s) en la carpeta")
             else:
                 self.status_var.set("⚠️ No se encontraron archivos .txt o .odt en la carpeta")
+
+    def _update_default_output(self):
+        """Actualiza la carpeta de salida por defecto basada en archivos seleccionados."""
+        if self.selected_files and not self.output_var.get():
+            # Usar la carpeta del primer archivo seleccionado
+            first_file = self.selected_files[0]
+            default_output = first_file.parent / "convertidos"
+            self.output_var.set(str(default_output))
 
     def _select_output_dir(self):
         """Selecciona carpeta de salida."""
@@ -251,6 +262,7 @@ class DialogConverterGUI:
         """Limpia la lista de archivos."""
         self.selected_files.clear()
         self._update_files_list()
+        self.output_var.set("")  # Limpiar también el output
         self.status_var.set("Lista de archivos limpiada")
 
     def _update_files_list(self):
@@ -292,7 +304,14 @@ class DialogConverterGUI:
             )
             return
         
-        output_path = Path(self.output_var.get())
+        # Si no hay output configurado, usar default
+        output_path_str = self.output_var.get()
+        if not output_path_str:
+            output_path = self.selected_files[0].parent / "convertidos"
+            self.output_var.set(str(output_path))
+        else:
+            output_path = Path(output_path_str)
+        
         output_path.mkdir(parents=True, exist_ok=True)
         
         # Reiniciar progreso
@@ -556,6 +575,7 @@ class DialogConverterGUI:
         lines = log_content.split('\n')
         in_change = False
         section = None
+        skip_diff = False
         
         for line in lines:
             stripped = line.strip()
@@ -578,10 +598,11 @@ class DialogConverterGUI:
             # Cambio individual
             if stripped.startswith('CAMBIO #'):
                 if in_change:
-                    text_widget.insert(tk.END, '\n')
+                    text_widget.insert(tk.END, '\n' + '─' * 80 + '\n\n')
                 text_widget.insert(tk.END, stripped + '\n', 'change_num')
                 in_change = True
                 section = None
+                skip_diff = False
                 continue
             
             # Ubicación del cambio
@@ -605,16 +626,21 @@ class DialogConverterGUI:
                 section = 'converted'
                 continue
             
+            # OCULTAR sección DIFF
             if stripped.startswith('DIFF'):
-                section = 'diff'
-                text_widget.insert(tk.END, '\n  ' + stripped + '\n', 'section')
+                skip_diff = True
+                section = None
                 continue
             
-            # Separador entre cambios
+            # Separador entre cambios - resetear skip_diff
             if stripped.startswith('-----'):
-                text_widget.insert(tk.END, line + '\n\n', 'separator')
                 in_change = False
                 section = None
+                skip_diff = False
+                continue
+            
+            # Saltar líneas de diff
+            if skip_diff:
                 continue
             
             # Contenido según sección
@@ -626,11 +652,8 @@ class DialogConverterGUI:
                 # Remover indentación inicial
                 content = line[2:] if line.startswith('  ') else line
                 text_widget.insert(tk.END, '    ' + content + '\n', 'converted')
-            elif section == 'diff' and line.strip():
-                # Diff sin colorear especial (ya está en sección)
-                text_widget.insert(tk.END, '    ' + line + '\n')
-            else:
-                # Líneas normales
+            elif not skip_diff and line.strip() and not stripped.startswith('-----'):
+                # Líneas normales (solo si no estamos en diff)
                 text_widget.insert(tk.END, line + '\n')
 
     def _open_folder(self, folder: Path):
