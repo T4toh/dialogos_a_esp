@@ -6,7 +6,37 @@ Historial de cambios del proyecto.
 
 ---
 
-## [1.6.0] - 2025-01-14
+## [2.0.0] - 2025-12-29
+
+### 🎉 Cambios Mayores
+
+- **Nueva interfaz gráfica nativa con Tkinter**
+  - Aplicación de escritorio sin dependencias
+  - Selección de archivos/carpetas con diálogos nativos del SO
+  - Tabla de archivos con información detallada (nombre, tipo, tamaño, ruta)
+  - Barra de progreso en tiempo real durante procesamiento
+  - Ventana de resultados con estadísticas y acceso rápido a carpeta de salida
+  - Sin navegador, sin latencia, totalmente offline
+  
+- **Eliminación de tests unitarios**
+  - Removidos todos los tests unitarios (tests/)
+  - Eliminados scripts de testing (run_all_tests.sh, verify.sh)
+  - Enfoque en testing real con archivos de usuario
+  - Logs detallados permiten validación manual de conversiones
+
+### 🔄 Cambios
+
+- Interfaz Streamlit ahora es opcional/alternativa
+- README actualizado con nueva UI como opción principal
+- Simplificación de dependencias: solo Python stdlib por defecto
+
+### 📝 Documentación
+
+- Guía completa de uso de GUI Tkinter
+- Ejemplos actualizados en README
+- Versión actualizada a 2.0.0
+
+---
 
 ## [1.6.2] - 2025-11-17
 

@@ -2,7 +2,7 @@
 
 Como escritor, escribo mis manuscritos (los que están en español) de la manera más cómoda posible y después paso todo a formato estándar español. Suelo usar un prompt pulido para un LLM, pero el resultado usualmente termina plachando (palabras perdidas, cambio de diálogos, cambio de voces, 'vos' pasados a 'ti', etc.). Así que pensé que esto debería poder hacerse de manera programática, cosa que ya existe en internet, pero a mí me gusta invocar a Bender y hacer mi propio script con juego de azar y mujerzuelas. Con esto en mente, escribí (con Claudio) este script. Yo estoy cómodo con la consola, pero agregué un Streamlit muy básico que usa el script para hacer los trabajos de manera más visual. En el front tiene un par de defectos, pero hace su trabajo. Por ejemplo, el explorador de carpetas deja mucho que desear.
 
-**Versión:** 1.6.2
+**Versión:** 2.0.0
 
 ---
 
@@ -24,14 +24,15 @@ Como escritor, escribo mis manuscritos (los que están en español) de la manera
 
 ## Características
 
-- ✅ Interfaz web visual con explorador de logs
+- ✅ **Interfaz gráfica nativa (Tkinter)** - Sin navegador, sin dependencias
+- ✅ Interfaz web alternativa (Streamlit) con explorador de logs
 - ✅ Línea de comandos (CLI)
 - ✅ Soporte para archivos ODT y TXT
 - ✅ Procesamiento por lotes de carpetas completas
 - ✅ Preserva formato de documentos ODT (estilos, metadatos)
 - ✅ Logs detallados con estadísticas (incluye exportación JSON con offsets y metadatos)
-- ✅ Modo oscuro/claro persistente
-- ✅ Sin dependencias externas (solo stdlib + Streamlit para web)
+- ✅ **Selección de archivos nativa del sistema operativo**
+- ✅ **Sin dependencias externas** (solo Python stdlib)
 
 ---
 
@@ -42,21 +43,47 @@ git clone <repo-url>
 cd dialogos_a_español
 ```
 
-### Para usar la interfaz web
+**No requiere dependencias** - Solo Python 3.11+
+
+### (Opcional) Para usar la interfaz web
 
 ```bash
-# Instalar Streamlit
 pip install streamlit
-
-# O con el script (instala automáticamente)
-./start_web.sh
 ```
 
 ---
 
 ## Uso
 
-### 🖥️ Interfaz Web (Recomendado)
+### 🖥️ Interfaz Gráfica (Recomendado)
+
+```bash
+python gui.py
+```
+
+**Características:**
+
+- ✨ Interfaz nativa del sistema operativo
+- 📁 Selección de archivos/carpetas con diálogos nativos
+- 📊 Tabla de archivos con información detallada
+- ⚡ Barra de progreso en tiempo real
+- 📈 Ventana de resultados con estadísticas
+- 🚀 Sin navegador, sin latencia, sin dependencias
+
+**Pasos:**
+
+1. Ejecuta `python gui.py` (o `./start_gui.sh`)
+2. Haz clic en "📁 Seleccionar Archivos" o "📂 Seleccionar Carpeta"
+3. (Opcional) Cambia la carpeta de salida
+4. Haz clic en "▶ Procesar Archivos"
+5. Revisa el resumen de resultados
+6. Abre la carpeta de salida desde la ventana de resultados
+
+**💡 Tip:** Usa los archivos ODT en `examples/` para probar el conversor con casos reales que incluyen estilos y formato complejo.
+
+---
+
+### 🌐 Interfaz Web Alternativa
 
 ```bash
 ./start_web.sh
@@ -64,26 +91,12 @@ pip install streamlit
 
 Se abre en tu navegador: `http://localhost:8501`
 
-**Características:**
+**Características adicionales:**
 
-- Navegador visual de carpetas
-- Contador de palabras por archivo
-- Selección múltiple con checkboxes
-- Barra de progreso en tiempo real
-- **📄 Visualizador de logs**: Explora todos los cambios realizados - El visor prefiere logs JSON estructurados cuando están disponibles y muestra la fuente del span para inspección rápida.
+- **📄 Visualizador de logs**: Explora todos los cambios realizados
 - **📊 Estadísticas**: Conteo de reglas aplicadas
-- Descarga logs individuales
 - Modo oscuro/claro persistente
-
-**Pasos:**
-
-1. Selecciona una carpeta (selector visual o escribir ruta)
-2. Haz clic en "🔍 Escanear"
-3. Selecciona los archivos que quieres procesar
-4. Configura carpeta de salida (opcional)
-5. Haz clic en "▶️ Iniciar Conversión"
-6. **Explora los cambios**: Visualizador integrado de logs con cada cambio detallado
-7. Descarga logs individuales o copia la ruta de salida
+- Descarga logs individuales
 
 ---
 
@@ -183,24 +196,20 @@ El conversor aplica las reglas editoriales del español según la **Real Academi
 ## Requisitos
 
 - Python 3.11+
-- Streamlit (solo para interfaz web)
+- Streamlit (solo para interfaz web, opcional)
 
 ---
 
-## Tests
+## Testing
 
-Para ejecutar todos los tests y una comprobación rápida de estilo (ruff) hemos añadido un script práctico en la raíz del proyecto.
+Usa los archivos de prueba que prefieras. El conversor genera logs detallados para cada conversión que muestran:
 
-```bash
-./run_all_tests.sh
-```
+- Todos los cambios realizados línea por línea
+- Regla aplicada (D1-D5)
+- Texto original vs convertido
+- Estadísticas de cambios
 
-Este script ejecuta un `ruff check` rápido si `ruff` está instalado y luego ejecuta
-`python -m unittest discover tests -v`.
-
-Última ejecución conocida: 29 tests (1 skip) ✅
-
-Nuevas pruebas: se añadió test para suprimir D1-no-op (`tests/test_converter.py::test_noop_d1_diálogo_adicional_suppressed`) y se integraron tests para la búsqueda de spans en la línea convertida `post_process_line_spans`.
+**Recomendación:** Prueba con tus propios archivos para validar el comportamiento en casos reales.
 
 ---
 
@@ -212,8 +221,6 @@ MIT License - Ver [LICENSE](LICENSE)
 
 ## Versión
 
-**1.6.2** - Mejoras en detectado y logging de spans, supresión de D1 no-op
-
-Ver [CHANGELOG.md](CHANGELOG.md) para historial completo de cambios.
+**2.0.0** - Interfaz gráfica nativa con Tkinter, eliminación de tests unitarios
 
 Ver [CHANGELOG.md](CHANGELOG.md) para historial completo de cambios.
