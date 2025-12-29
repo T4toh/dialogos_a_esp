@@ -62,33 +62,36 @@ class DialogConverterGUI:
             text="Convierte diálogos con comillas al formato español con raya (—)",
             font=('Helvetica', 10)
         )
-        subtitle.grid(row=1, column=0, pady=(0, 20), sticky=tk.W)
+        subtitle.grid(row=1, column=0, pady=(0, 10), sticky=tk.W)
         
-        # Botones de selección
+        # Botones de selección (centrados)
         buttons_frame = ttk.Frame(main_frame)
-        buttons_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        buttons_frame.grid(row=2, column=0, sticky=tk.EW, pady=(0, 5))
+        buttons_frame.columnconfigure(0, weight=1)
+        buttons_frame.columnconfigure(1, weight=1)
+        buttons_frame.columnconfigure(2, weight=1)
         
         ttk.Button(
             buttons_frame,
             text="📁 Seleccionar Archivos",
             command=self._select_files
-        ).pack(side=tk.LEFT, padx=(0, 10))
+        ).grid(row=0, column=0, padx=5, sticky=tk.EW)
         
         ttk.Button(
             buttons_frame,
             text="📂 Seleccionar Carpeta",
             command=self._select_folder
-        ).pack(side=tk.LEFT, padx=(0, 10))
+        ).grid(row=0, column=1, padx=5, sticky=tk.EW)
         
         ttk.Button(
             buttons_frame,
             text="🗑️ Limpiar Lista",
             command=self._clear_files
-        ).pack(side=tk.LEFT, padx=(0, 10))
+        ).grid(row=0, column=2, padx=5, sticky=tk.EW)
         
         # Separator
         ttk.Separator(main_frame, orient='horizontal').grid(
-            row=3, column=0, sticky=(tk.W, tk.E), pady=10
+            row=3, column=0, sticky=(tk.W, tk.E), pady=5
         )
         
         # Frame de archivos con scrollbar
@@ -396,28 +399,29 @@ class DialogConverterGUI:
         tree.column('estado', width=150)
         tree.column('cambios', width=150)
         
-        # Mapeo de items a archivos de log
+        # Mapeo de items a archivos de log (por nombre de archivo)
         self.result_logs = {}
         
         for idx, (file_path, success, result) in enumerate(results):
-            if success:
-                status = "✅ Éxito"
-                changes = str(result.get('changes', 0))
-                # Guardar path del log
-                log_file = output_dir / f"{Path(file_path).stem}_convertido.log.txt"
-                self.result_logs[idx] = log_file
-            else:
-                status = "❌ Error"
-                changes = "-"
-                self.result_logs[idx] = None
-            
             # Asegurar que file_path sea Path
             if isinstance(file_path, str):
                 file_path = Path(file_path)
             
-            item_id = tree.insert('', 'end', values=(file_path.name, status, changes))
-            # Guardar el índice en el item para poder recuperar el log
-            tree.set(item_id, '#0', idx)
+            filename = file_path.name
+            
+            if success:
+                status = "✅ Éxito"
+                changes = str(result.get('changes', 0))
+                # Guardar path del log usando el nombre de archivo como clave
+                log_file = output_dir / f"{file_path.stem}_convertido.log.txt"
+                self.result_logs[filename] = log_file
+            else:
+                status = "❌ Error"
+                changes = "-"
+                self.result_logs[filename] = None
+            
+            # Insertar en el tree sin intentar modificar la columna #0
+            tree.insert('', 'end', values=(filename, status, changes))
         
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         vsb.pack(side=tk.RIGHT, fill=tk.Y)
@@ -429,24 +433,18 @@ class DialogConverterGUI:
                 messagebox.showinfo("Sin selección", "Por favor, selecciona un archivo para ver su log")
                 return
             
-            # Obtener índice del primer item seleccionado
+            # Obtener el nombre del archivo del primer item seleccionado
             item_id = selection[0]
-            # El índice está guardado en la columna #0
             values = tree.item(item_id, 'values')
             filename = values[0]
             
             # Buscar el log correspondiente
-            log_file = None
-            for idx, log_path in self.result_logs.items():
-                item = tree.get_children()[idx]
-                if tree.item(item, 'values')[0] == filename:
-                    log_file = log_path
-                    break
+            log_file = self.result_logs.get(filename)
             
             if log_file and log_file.exists():
                 self._show_log_window(log_file, filename)
             else:
-                messagebox.showerror("Error", "No se encontró el archivo de log")
+                messagebox.showerror("Error", f"No se encontró el archivo de log para: {filename}")
         
         # Doble clic para ver log
         tree.bind('<Double-Button-1>', lambda e: view_selected_log())
