@@ -2,7 +2,8 @@
 Interfaz gráfica con Tkinter para el conversor de diálogos.
 """
 
-import sys
+import platform
+import subprocess
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -41,7 +42,7 @@ class DialogConverterGUI:
         """Crea los widgets de la interfaz."""
         # Frame principal con padding
         main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        main_frame.grid(row=0, column=0, sticky="nsew")
         
         # Configurar grid
         self.root.columnconfigure(0, weight=1)
@@ -91,7 +92,7 @@ class DialogConverterGUI:
         
         # Separator
         ttk.Separator(main_frame, orient='horizontal').grid(
-            row=3, column=0, sticky=(tk.W, tk.E), pady=5
+            row=3, column=0, sticky="ew", pady=5
         )
         
         # Frame de archivos con scrollbar
@@ -100,11 +101,11 @@ class DialogConverterGUI:
             text="Archivos seleccionados:",
             font=('Helvetica', 11, 'bold')
         )
-        files_label.grid(row=4, column=0, sticky=tk.W, pady=(0, 5))
+        files_label.grid(row=4, column=0, sticky="w", pady=(0, 5))
         
         # Treeview para lista de archivos
         tree_frame = ttk.Frame(main_frame)
-        tree_frame.grid(row=5, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        tree_frame.grid(row=5, column=0, sticky="nsew")
         tree_frame.columnconfigure(0, weight=1)
         tree_frame.rowconfigure(0, weight=1)
         
@@ -135,17 +136,17 @@ class DialogConverterGUI:
         self.files_tree.column('ruta', width=400)
         
         # Grid layout
-        self.files_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        vsb.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        hsb.grid(row=1, column=0, sticky=(tk.W, tk.E))
+        self.files_tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
         
         # Output directory
         output_frame = ttk.Frame(main_frame)
-        output_frame.grid(row=6, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
+        output_frame.grid(row=6, column=0, sticky="ew", pady=(10, 0))
         output_frame.columnconfigure(1, weight=1)
         
         ttk.Label(output_frame, text="Carpeta de salida:").grid(
-            row=0, column=0, sticky=tk.W, padx=(0, 10)
+            row=0, column=0, sticky="w", padx=(0, 10)
         )
         
         # Default: carpeta del primer archivo seleccionado / convertidos
@@ -155,7 +156,7 @@ class DialogConverterGUI:
             textvariable=self.output_var,
             width=50
         )
-        output_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+        output_entry.grid(row=0, column=1, sticky="ew", padx=(0, 10))
         
         ttk.Button(
             output_frame,
@@ -170,7 +171,7 @@ class DialogConverterGUI:
             mode='determinate',
             length=300
         )
-        self.progress.grid(row=7, column=0, sticky=(tk.W, tk.E), pady=(10, 5))
+        self.progress.grid(row=7, column=0, sticky="ew", pady=(10, 5))
         
         # Status label
         self.status_var = tk.StringVar(value="Listo para procesar archivos")
@@ -179,7 +180,7 @@ class DialogConverterGUI:
             textvariable=self.status_var,
             font=('Helvetica', 9)
         )
-        status_label.grid(row=8, column=0, sticky=tk.W)
+        status_label.grid(row=8, column=0, sticky="w")
         
         # Botón procesar (con sticky para que ocupe todo el ancho, sin emoji)
         process_button = ttk.Button(
@@ -188,7 +189,7 @@ class DialogConverterGUI:
             command=self._process_files,
             style='Accent.TButton'
         )
-        process_button.grid(row=9, column=0, pady=(15, 0), sticky=(tk.W, tk.E))
+        process_button.grid(row=9, column=0, pady=(15, 0), sticky="ew")
         
         # Configurar estilo del botón
         self.style.configure('Accent.TButton', font=('Helvetica', 11, 'bold'), padding=10)
@@ -290,11 +291,12 @@ class DialogConverterGUI:
 
     def _format_size(self, size_bytes: int) -> str:
         """Formatea tamaño de archivo."""
+        size: float = float(size_bytes)
         for unit in ['B', 'KB', 'MB', 'GB']:
-            if size_bytes < 1024.0:
-                return f"{size_bytes:.1f} {unit}"
-            size_bytes /= 1024.0
-        return f"{size_bytes:.1f} TB"
+            if size < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} TB"
 
     def _process_files(self):
         """Procesa los archivos seleccionados usando BatchProcessor."""
@@ -659,9 +661,6 @@ class DialogConverterGUI:
 
     def _open_folder(self, folder: Path):
         """Abre carpeta en explorador del sistema."""
-        import subprocess
-        import platform
-        
         system = platform.system()
         
         try:
@@ -678,7 +677,7 @@ class DialogConverterGUI:
 def main():
     """Punto de entrada de la aplicación."""
     root = tk.Tk()
-    app = DialogConverterGUI(root)
+    DialogConverterGUI(root)
     root.mainloop()
 
 
