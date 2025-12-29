@@ -290,7 +290,8 @@ class ConversionLogger:
         """
         buffer = io.StringIO()
 
-        buffer.write("LOG DE CONVERSIÓN DE DIÁLOGOS A FORMATO ESPAÑOL\n")
+        buffer.write("\n")
+        buffer.write("RESUMEN DE CONVERSIÓN\n")
         buffer.write("=" * 80 + "\n\n")
 
         buffer.write(f"Total de cambios realizados: {len(self.changes)}\n\n")
