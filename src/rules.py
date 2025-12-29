@@ -151,6 +151,10 @@ DIALOG_TAGS = [
     "tartamudea",
     "tartamudearon",  # Plural de tartamudeó
     "tartamudean",  # Plural de tartamudea
+    "aportó",
+    "aporta",
+    "aportaron",  # Plural de aportó
+    "aportan",  # Plural de aporta
 ]
 
 
