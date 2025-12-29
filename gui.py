@@ -64,7 +64,7 @@ class DialogConverterGUI:
         )
         subtitle.grid(row=1, column=0, pady=(0, 10), sticky=tk.W)
         
-        # Botones de selección (centrados)
+        # Botones de selección (centrados, sin emojis)
         buttons_frame = ttk.Frame(main_frame)
         buttons_frame.grid(row=2, column=0, sticky=tk.EW, pady=(0, 5))
         buttons_frame.columnconfigure(0, weight=1)
@@ -73,19 +73,19 @@ class DialogConverterGUI:
         
         ttk.Button(
             buttons_frame,
-            text="📁 Seleccionar Archivos",
+            text="Seleccionar Archivos",
             command=self._select_files
         ).grid(row=0, column=0, padx=5, sticky=tk.EW)
         
         ttk.Button(
             buttons_frame,
-            text="📂 Seleccionar Carpeta",
+            text="Seleccionar Carpeta",
             command=self._select_folder
         ).grid(row=0, column=1, padx=5, sticky=tk.EW)
         
         ttk.Button(
             buttons_frame,
-            text="🗑️ Limpiar Lista",
+            text="Limpiar Lista",
             command=self._clear_files
         ).grid(row=0, column=2, padx=5, sticky=tk.EW)
         
@@ -181,10 +181,10 @@ class DialogConverterGUI:
         )
         status_label.grid(row=8, column=0, sticky=tk.W)
         
-        # Botón procesar (con sticky para que ocupe todo el ancho)
+        # Botón procesar (con sticky para que ocupe todo el ancho, sin emoji)
         process_button = ttk.Button(
             main_frame,
-            text="▶ Procesar Archivos",
+            text="Procesar Archivos",
             command=self._process_files,
             style='Accent.TButton'
         )
@@ -474,13 +474,13 @@ class DialogConverterGUI:
         
         ttk.Button(
             button_frame,
-            text="📄 Ver Log",
+            text="Ver Log",
             command=view_selected_log
         ).pack(side=tk.LEFT, padx=5)
         
         ttk.Button(
             button_frame,
-            text="📂 Abrir Carpeta de Salida",
+            text="Abrir Carpeta de Salida",
             command=lambda: self._open_folder(output_dir)
         ).pack(side=tk.LEFT, padx=5)
         
