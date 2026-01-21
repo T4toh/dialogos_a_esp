@@ -1,8 +1,8 @@
 # Conversor de Diálogos a Español
 
-Como escritor, escribo mis manuscritos (los que están en español) de la manera más cómoda posible y después paso todo a formato estándar español. Suelo usar un prompt pulido para un LLM, pero el resultado usualmente termina plachando (palabras perdidas, cambio de diálogos, cambio de voces, 'vos' pasados a 'ti', etc.). Así que pensé que esto debería poder hacerse de manera programática, cosa que ya existe en internet, pero a mí me gusta invocar a Bender y hacer mi propio script con juego de azar y mujerzuelas. Con esto en mente, escribí (con Claudio) este script. Yo estoy cómodo con la consola, pero agregué un Streamlit muy básico que usa el script para hacer los trabajos de manera más visual. En el front tiene un par de defectos, pero hace su trabajo. Por ejemplo, el explorador de carpetas deja mucho que desear.
+Como escritor, escribo mis manuscritos (los que están en español) de la manera más cómoda posible y después paso todo a formato estándar español. Suelo usar un prompt pulido para un LLM, pero el resultado usualmente termina plachando (palabras perdidas, cambio de diálogos, cambio de voces, 'vos' pasados a 'ti', etc.). Así que pensé que esto debería poder hacerse de manera programática, cosa que ya existe en internet, pero a mí me gusta invocar a Bender y hacer mi propio script con juego de azar y mujerzuelas. Con esto en mente, escribí (con Claudio) este script.
 
-**Versión:** 2.0.0
+**Versión:** 2.1.0
 
 ---
 
@@ -25,7 +25,6 @@ Como escritor, escribo mis manuscritos (los que están en español) de la manera
 ## Características
 
 - ✅ **Interfaz gráfica nativa (Tkinter)** - Sin navegador, sin dependencias
-- ✅ Interfaz web alternativa (Streamlit) con explorador de logs
 - ✅ Línea de comandos (CLI)
 - ✅ Soporte para archivos ODT y TXT
 - ✅ Procesamiento por lotes de carpetas completas
@@ -45,17 +44,11 @@ cd dialogos_a_español
 
 **No requiere dependencias** - Solo Python 3.11+
 
-### (Opcional) Para usar la interfaz web
-
-```bash
-pip install streamlit
-```
-
 ---
 
 ## Uso
 
-### 🖥️ Interfaz Gráfica (Recomendado)
+### 🖥️ Interfaz Gráfica
 
 ```bash
 python gui.py
@@ -80,23 +73,6 @@ python gui.py
 6. Abre la carpeta de salida desde la ventana de resultados
 
 **💡 Tip:** Usa los archivos ODT en `examples/` para probar el conversor con casos reales que incluyen estilos y formato complejo.
-
----
-
-### 🌐 Interfaz Web Alternativa
-
-```bash
-./start_web.sh
-```
-
-Se abre en tu navegador: `http://localhost:8501`
-
-**Características adicionales:**
-
-- **📄 Visualizador de logs**: Explora todos los cambios realizados
-- **📊 Estadísticas**: Conteo de reglas aplicadas
-- Modo oscuro/claro persistente
-- Descarga logs individuales
 
 ---
 
@@ -159,10 +135,6 @@ Cada conversión genera **dos archivos**:
    - `original_span` / `converted_span`: offsets en el bloque
    - `original_span_source` / `converted_span_source`: cómo se encontró el span (`exact`, `fuzzy`, `raw`, `full_text`, `full_converted`, `normalized`)
 
-Nota: si el JSON está presente, el visor de Streamlit lo usará para resaltado 1:1; si no, se ejecutará el fallback de diffs por palabras.
-
-**Tip:** La interfaz web muestra estos logs de forma visual con búsqueda y filtros.
-
 ---
 
 ## Reglas de Conversión
@@ -196,7 +168,6 @@ El conversor aplica las reglas editoriales del español según la **Real Academi
 ## Requisitos
 
 - Python 3.11+
-- Streamlit (solo para interfaz web, opcional)
 
 ---
 
@@ -221,6 +192,6 @@ MIT License - Ver [LICENSE](LICENSE)
 
 ## Versión
 
-**2.0.0** - Interfaz gráfica nativa con Tkinter, eliminación de tests unitarios
+**2.1.0** - Eliminación de interfaz web (Streamlit). Enfoque en GUI nativa (Tkinter) y CLI.
 
 Ver [CHANGELOG.md](CHANGELOG.md) para historial completo de cambios.
