@@ -1,3 +1,0 @@
-"""
-Páginas de la aplicación.
-"""

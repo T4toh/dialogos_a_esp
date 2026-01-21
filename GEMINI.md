@@ -4,15 +4,14 @@
 
 **Dialogos a Español** is a Python-based tool designed for writers to convert manuscript dialogs from English-style formatting (using quotes) to Spanish-style formatting (using em dashes/rayas), strictly adhering to Real Academia Española (RAE) rules.
 
-The project offers three modes of operation:
+The project offers two modes of operation:
 1.  **Native GUI:** Built with Tkinter (standard library) for a dependency-free experience.
-2.  **Web Interface:** Built with Streamlit for a visual, browser-based experience with detailed log exploration.
-3.  **CLI:** A command-line interface for batch processing and automation.
+2.  **CLI:** A command-line interface for batch processing and automation.
 
 ### Key Features
 *   **Format Support:** Handles plain text (`.txt`) and OpenDocument Text (`.odt`), preserving ODT styles and metadata.
 *   **RAE Compliance:** Implements specific rules (D1-D5) for dialog tags, punctuation, and continuations.
-*   **Minimal Dependencies:** The core logic and GUI rely solely on the Python standard library. Streamlit is optional.
+*   **Minimal Dependencies:** The project relies solely on the Python standard library.
 
 ## Architecture
 
@@ -22,14 +21,13 @@ The project offers three modes of operation:
     *   `src/odt_handler.py`: Specialized handling for `.odt` files (zipping/unzipping/XML parsing).
     *   `src/main.py`: Entry point for the CLI.
 *   **GUI:** `gui.py` implements the Tkinter interface.
-*   **Web UI:** `ui/` contains the Streamlit application code.
 *   **Examples:** `examples/` contains sample files for testing conversion.
 
 ## Building and Running
 
 ### Prerequisites
 *   **Python:** Version 3.11 or higher is required.
-*   **Dependencies:** None for CLI/GUI. `streamlit` is required for the Web UI.
+*   **Dependencies:** None.
 
 ### Running the Application
 
@@ -40,18 +38,7 @@ The project offers three modes of operation:
 python gui.py
 ```
 
-**2. Web Interface**
-```bash
-# Install dependency first
-pip install streamlit
-
-# Run
-./start_web.sh
-# OR
-streamlit run ui/app.py
-```
-
-**3. Command Line (CLI)**
+**2. Command Line (CLI)**
 ```bash
 # Process a single file
 python -m src.main path/to/file.txt
