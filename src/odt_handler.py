@@ -334,7 +334,8 @@ class ODTProcessor:
         orig_tokens: list[str],
         orig_styles: list[Optional[str]],
         conv_tokens: list[str],
-    ) -> list[Optional[str]]:
+        unset_value=None,
+    ) -> list:
         """Alinea estilos de tokens originales a tokens convertidos.
 
         Usa SequenceMatcher para encontrar bloques iguales y asigna estilos
@@ -346,7 +347,7 @@ class ODTProcessor:
         conv_norm = [t.strip() for t in conv_tokens]
 
         matcher = difflib.SequenceMatcher(None, orig_norm, conv_norm)
-        result_styles: list[Optional[str]] = [None for _ in range(len(conv_tokens))]
+        result_styles = [unset_value for _ in range(len(conv_tokens))]
 
         for tag, i1, i2, j1, j2 in matcher.get_opcodes():
             if tag == "equal":
@@ -639,6 +640,9 @@ class ODTProcessor:
 
         # Namespaces
         ns_text = "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}"
+        
+        # Sentinel for unknown style
+        UNSET = object()
 
         # Procesar cada segmento
         for seg_idx, segment_text in enumerate(segments):
@@ -686,17 +690,17 @@ class ODTProcessor:
                 orig_seg_text = original_segments[seg_idx]
                 orig_tokens = self._split_preserving_spaces(orig_seg_text)
                 converted_tokens = words
-                styles_for_tokens: list[Optional[str]] = self._align_token_styles(
-                    orig_tokens, ts_for_segment, converted_tokens
+                styles_for_tokens = self._align_token_styles(
+                    orig_tokens, ts_for_segment, converted_tokens, unset_value=UNSET
                 )
             elif ts_for_segment is not None:
                 # Sin segmentos originales, intentar usar estilos por índice
                 styles_for_tokens = [
-                    ts_for_segment[i] if i < len(ts_for_segment) else None
+                    ts_for_segment[i] if i < len(ts_for_segment) else UNSET
                     for i in range(len(words))
                 ]
             else:
-                styles_for_tokens = [None for _ in range(len(words))]
+                styles_for_tokens = [UNSET for _ in range(len(words))]
 
             # Para tokens, aplicar FORCED NORMALIZATION para marcadores de diálogo
             # y luego, si no hay estilo asignado,
@@ -709,7 +713,7 @@ class ODTProcessor:
                 # estilos en tokens seguidores de una raya. De esta forma, si
                 # la palabra realmente tenía estilo en el original (mapa), lo
                 # conservamos, evitando quitarlo por error (caso "Uno studio...").
-                if styles_for_tokens[i] is None:
+                if styles_for_tokens[i] is UNSET:
                     if token_stripped:
                         styles_for_tokens[i] = get_word_style_from_map_consume(
                             token_stripped
@@ -726,8 +730,10 @@ class ODTProcessor:
                 if prev_stripped and (
                     prev_stripped.startswith("—") or prev_stripped.startswith("-")
                 ):
-                    if styles_for_tokens[i] is None:
+                    if styles_for_tokens[i] is UNSET or styles_for_tokens[i] is None:
                         # leave as None (explicit) and continue
+                        # Ensure it's None and not UNSET for final processing
+                        styles_for_tokens[i] = None
                         continue
 
                 # FORCED NORMALIZATION: si el token empieza con raya (—) o guion (-),
@@ -735,8 +741,9 @@ class ODTProcessor:
                 if token_stripped and (
                     token_stripped.startswith("—") or token_stripped.startswith("-")
                 ):
-                    if styles_for_tokens[i] is None:
-                        continue
+                    if styles_for_tokens[i] is UNSET or styles_for_tokens[i] is None:
+                         styles_for_tokens[i] = None
+                         continue
 
             # Agrupar tokens consecutivos con el mismo estilo
             groups = []
