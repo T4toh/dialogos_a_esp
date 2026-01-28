@@ -49,7 +49,7 @@ class DialogConverterGUI:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(2, weight=1)
+        main_frame.rowconfigure(6, weight=1)
         
         # Header
         header = ttk.Label(
@@ -160,7 +160,7 @@ class DialogConverterGUI:
         
         # Output directory
         output_frame = ttk.Frame(main_frame)
-        output_frame.grid(row=6, column=0, sticky="ew", pady=(10, 0))
+        output_frame.grid(row=7, column=0, sticky="ew", pady=(10, 0))
         output_frame.columnconfigure(1, weight=1)
         
         ttk.Label(output_frame, text="Carpeta de salida:").grid(
@@ -189,7 +189,7 @@ class DialogConverterGUI:
             mode='determinate',
             length=300
         )
-        self.progress.grid(row=7, column=0, sticky="ew", pady=(10, 5))
+        self.progress.grid(row=8, column=0, sticky="ew", pady=(10, 5))
         
         # Status label
         self.status_var = tk.StringVar(value="Listo para procesar archivos")
@@ -198,7 +198,7 @@ class DialogConverterGUI:
             textvariable=self.status_var,
             font=('Helvetica', 9)
         )
-        status_label.grid(row=8, column=0, sticky="w")
+        status_label.grid(row=9, column=0, sticky="w")
         
         # Botón procesar (con sticky para que ocupe todo el ancho, sin emoji)
         process_button = ttk.Button(
@@ -207,7 +207,7 @@ class DialogConverterGUI:
             command=self._process_files,
             style='Accent.TButton'
         )
-        process_button.grid(row=9, column=0, pady=(15, 0), sticky="ew")
+        process_button.grid(row=10, column=0, pady=(15, 0), sticky="ew")
         
         # Configurar estilo del botón
         self.style.configure('Accent.TButton', font=('Helvetica', 11, 'bold'), padding=10)
