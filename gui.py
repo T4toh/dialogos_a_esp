@@ -44,7 +44,7 @@ class DialogConverterGUI:
 
     def _setup_icon(self):
         """Configura el ícono de la ventana."""
-        icon_path = Path(__file__).parent / "icon.jpg"
+        icon_path = Path(__file__).parent / "icon.png"
         if icon_path.exists():
             try:
                 icon = tk.PhotoImage(file=str(icon_path))
