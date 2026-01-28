@@ -18,7 +18,7 @@ class DialogConverterGUI:
 
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("📝 Conversor de Diálogos a Español")
+        self.root.title("Conversor de Diálogos a Español")
         self.root.geometry("1000x750")
         
         # Prevenir que la ventana sea más pequeña
