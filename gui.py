@@ -103,7 +103,7 @@ class DialogConverterGUI:
             main_frame,
             text="Buscar en subcarpetas (Recursivo)",
             variable=self.recursive_var
-        ).grid(row=3, column=0, sticky="w", padx=5)
+        ).grid(row=3, column=0, sticky="w", padx=5, pady=2)
         
         # Separator
         ttk.Separator(main_frame, orient='horizontal').grid(
@@ -237,7 +237,7 @@ class DialogConverterGUI:
             
             self._update_files_list()
             self._update_default_output()
-            self.status_var.set(f"✅ {len(self.selected_files)} archivo(s) seleccionado(s)")
+            self.status_var.set(f"OK: {len(self.selected_files)} archivo(s) seleccionado(s)")
 
     def _select_folder(self):
         """Abre diálogo para seleccionar carpeta."""
@@ -260,9 +260,9 @@ class DialogConverterGUI:
             self._update_default_output()
             
             if new_files:
-                self.status_var.set(f"✅ {len(new_files)} archivo(s) encontrado(s) en la carpeta")
+                self.status_var.set(f"OK: {len(new_files)} archivo(s) encontrado(s) en la carpeta")
             else:
-                self.status_var.set("⚠️ No se encontraron archivos .txt o .odt en la carpeta")
+                self.status_var.set("AVISO: No se encontraron archivos .txt o .odt en la carpeta")
 
     def _update_default_output(self):
         """Actualiza la carpeta de salida por defecto basada en archivos seleccionados."""
@@ -306,7 +306,7 @@ class DialogConverterGUI:
         # Actualizar UI
         self._update_files_list()
         self._update_default_output()
-        self.status_var.set(f"🗑️ Se eliminaron {len(files_to_remove)} archivos de la lista")
+        self.status_var.set(f"INFO: Se eliminaron {len(files_to_remove)} archivos de la lista")
 
     def _clear_files(self):
         """Limpia la lista de archivos."""
@@ -429,10 +429,10 @@ class DialogConverterGUI:
         header_frame.pack(fill=tk.X)
         
         if success_count == total:
-            message = f"✅ Se procesaron exitosamente {total} archivo(s)"
+            message = f"OK: Se procesaron exitosamente {total} archivo(s)"
             color = 'green'
         else:
-            message = f"⚠️ Se procesaron {success_count}/{total} archivo(s)"
+            message = f"AVISO: Se procesaron {success_count}/{total} archivo(s)"
             color = 'orange'
         
         ttk.Label(
@@ -480,13 +480,13 @@ class DialogConverterGUI:
             filename = file_path.name
             
             if success:
-                status = "✅ Éxito"
+                status = "OK"
                 changes = str(result.get('changes', 0))
                 # Guardar path del log usando el nombre de archivo como clave
                 log_file = output_dir / f"{file_path.stem}_convertido.log.txt"
                 self.result_logs[filename] = log_file
             else:
-                status = "❌ Error"
+                status = "ERROR"
                 changes = "-"
                 self.result_logs[filename] = None
             
@@ -542,7 +542,7 @@ class DialogConverterGUI:
         ).pack(side=tk.RIGHT, padx=5)
         
         # Actualizar status principal
-        self.status_var.set(f"✅ Procesamiento completado: {success_count}/{total} archivos")
+        self.status_var.set(f"OK: Procesamiento completado: {success_count}/{total} archivos")
 
     def _show_log_window(self, log_file: Path, filename: str):
         """Muestra ventana con el contenido del log formateado."""
