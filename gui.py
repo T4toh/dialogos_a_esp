@@ -18,7 +18,7 @@ class DialogConverterGUI:
 
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("📝 Conversor de Diálogos a Español")
+        self.root.title("Conversor de Diálogos a Español")
         self.root.geometry("1000x750")
         
         # Prevenir que la ventana sea más pequeña
@@ -27,6 +27,7 @@ class DialogConverterGUI:
         # Variables
         self.selected_files: List[Path] = []
         self.output_dir: Optional[Path] = None
+        self.recursive_var = tk.BooleanVar(value=True)
         
         # Configurar estilo
         self.style = ttk.Style()
@@ -35,8 +36,21 @@ class DialogConverterGUI:
         # Crear UI
         self._create_widgets()
         
+        # Configurar ícono si existe
+        self._setup_icon()
+        
         # Configurar drag & drop (cross-platform)
         self._setup_drag_drop()
+
+    def _setup_icon(self):
+        """Configura el ícono de la ventana."""
+        icon_path = Path(__file__).parent / "icon.png"
+        if icon_path.exists():
+            try:
+                icon = tk.PhotoImage(file=str(icon_path))
+                self.root.iconphoto(True, icon)
+            except Exception:
+                pass  # Silently fail if icon cannot be loaded
 
     def _create_widgets(self):
         """Crea los widgets de la interfaz."""
@@ -48,7 +62,7 @@ class DialogConverterGUI:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(2, weight=1)
+        main_frame.rowconfigure(6, weight=1)
         
         # Header
         header = ttk.Label(
@@ -71,6 +85,7 @@ class DialogConverterGUI:
         buttons_frame.columnconfigure(0, weight=1)
         buttons_frame.columnconfigure(1, weight=1)
         buttons_frame.columnconfigure(2, weight=1)
+        buttons_frame.columnconfigure(3, weight=1)
         
         ttk.Button(
             buttons_frame,
@@ -83,16 +98,29 @@ class DialogConverterGUI:
             text="Seleccionar Carpeta",
             command=self._select_folder
         ).grid(row=0, column=1, padx=5, sticky=tk.EW)
+
+        ttk.Button(
+            buttons_frame,
+            text="Eliminar Seleccionados",
+            command=self._remove_selected_files
+        ).grid(row=0, column=2, padx=5, sticky=tk.EW)
         
         ttk.Button(
             buttons_frame,
             text="Limpiar Lista",
             command=self._clear_files
-        ).grid(row=0, column=2, padx=5, sticky=tk.EW)
+        ).grid(row=0, column=3, padx=5, sticky=tk.EW)
+
+        # Checkbox recursivo
+        ttk.Checkbutton(
+            main_frame,
+            text="Buscar en subcarpetas (Recursivo)",
+            variable=self.recursive_var
+        ).grid(row=3, column=0, sticky="w", padx=5, pady=2)
         
         # Separator
         ttk.Separator(main_frame, orient='horizontal').grid(
-            row=3, column=0, sticky="ew", pady=5
+            row=4, column=0, sticky="ew", pady=5
         )
         
         # Frame de archivos con scrollbar
@@ -101,11 +129,11 @@ class DialogConverterGUI:
             text="Archivos seleccionados:",
             font=('Helvetica', 11, 'bold')
         )
-        files_label.grid(row=4, column=0, sticky="w", pady=(0, 5))
+        files_label.grid(row=5, column=0, sticky="w", pady=(0, 5))
         
         # Treeview para lista de archivos
         tree_frame = ttk.Frame(main_frame)
-        tree_frame.grid(row=5, column=0, sticky="nsew")
+        tree_frame.grid(row=6, column=0, sticky="nsew")
         tree_frame.columnconfigure(0, weight=1)
         tree_frame.rowconfigure(0, weight=1)
         
@@ -124,6 +152,9 @@ class DialogConverterGUI:
         vsb.config(command=self.files_tree.yview)
         hsb.config(command=self.files_tree.xview)
         
+        # Bind tecla Delete/Supr
+        self.files_tree.bind('<Delete>', lambda e: self._remove_selected_files())
+
         # Configurar columnas
         self.files_tree.heading('nombre', text='Nombre')
         self.files_tree.heading('tipo', text='Tipo')
@@ -142,7 +173,7 @@ class DialogConverterGUI:
         
         # Output directory
         output_frame = ttk.Frame(main_frame)
-        output_frame.grid(row=6, column=0, sticky="ew", pady=(10, 0))
+        output_frame.grid(row=7, column=0, sticky="ew", pady=(10, 0))
         output_frame.columnconfigure(1, weight=1)
         
         ttk.Label(output_frame, text="Carpeta de salida:").grid(
@@ -171,7 +202,7 @@ class DialogConverterGUI:
             mode='determinate',
             length=300
         )
-        self.progress.grid(row=7, column=0, sticky="ew", pady=(10, 5))
+        self.progress.grid(row=8, column=0, sticky="ew", pady=(10, 5))
         
         # Status label
         self.status_var = tk.StringVar(value="Listo para procesar archivos")
@@ -180,7 +211,7 @@ class DialogConverterGUI:
             textvariable=self.status_var,
             font=('Helvetica', 9)
         )
-        status_label.grid(row=8, column=0, sticky="w")
+        status_label.grid(row=9, column=0, sticky="w")
         
         # Botón procesar (con sticky para que ocupe todo el ancho, sin emoji)
         process_button = ttk.Button(
@@ -189,7 +220,7 @@ class DialogConverterGUI:
             command=self._process_files,
             style='Accent.TButton'
         )
-        process_button.grid(row=9, column=0, pady=(15, 0), sticky="ew")
+        process_button.grid(row=10, column=0, pady=(15, 0), sticky="ew")
         
         # Configurar estilo del botón
         self.style.configure('Accent.TButton', font=('Helvetica', 11, 'bold'), padding=10)
@@ -219,7 +250,7 @@ class DialogConverterGUI:
             
             self._update_files_list()
             self._update_default_output()
-            self.status_var.set(f"✅ {len(self.selected_files)} archivo(s) seleccionado(s)")
+            self.status_var.set(f"OK: {len(self.selected_files)} archivo(s) seleccionado(s)")
 
     def _select_folder(self):
         """Abre diálogo para seleccionar carpeta."""
@@ -232,7 +263,7 @@ class DialogConverterGUI:
             # Buscar recursivamente para encontrar archivos en subcarpetas
             converter = DialogConverter()
             batch = BatchProcessor(converter)
-            new_files = batch.find_files(folder_path, "*.*", recursive=True)
+            new_files = batch.find_files(folder_path, "*.*", recursive=self.recursive_var.get())
             
             for file_path in new_files:
                 if file_path not in self.selected_files:
@@ -242,9 +273,9 @@ class DialogConverterGUI:
             self._update_default_output()
             
             if new_files:
-                self.status_var.set(f"✅ {len(new_files)} archivo(s) encontrado(s) en la carpeta")
+                self.status_var.set(f"OK: {len(new_files)} archivo(s) encontrado(s) en la carpeta")
             else:
-                self.status_var.set("⚠️ No se encontraron archivos .txt o .odt en la carpeta")
+                self.status_var.set("AVISO: No se encontraron archivos .txt o .odt en la carpeta")
 
     def _update_default_output(self):
         """Actualiza la carpeta de salida por defecto basada en archivos seleccionados."""
@@ -259,6 +290,36 @@ class DialogConverterGUI:
         folder = filedialog.askdirectory(title="Seleccionar carpeta de salida")
         if folder:
             self.output_var.set(folder)
+
+    def _remove_selected_files(self):
+        """Elimina los archivos seleccionados de la lista."""
+        selected_items = self.files_tree.selection()
+        if not selected_items:
+            messagebox.showinfo("Sin selección", "Por favor, selecciona archivos para eliminar")
+            return
+
+        # Confirmación si son muchos archivos
+        if len(selected_items) > 1:
+            if not messagebox.askyesno("Confirmar", f"¿Eliminar {len(selected_items)} archivos de la lista?"):
+                return
+
+        # Identificar archivos a eliminar
+        files_to_remove = []
+        for item_id in selected_items:
+            values = self.files_tree.item(item_id, 'values')
+            # Reconstruir path: values[3] es la ruta padre, values[0] es el nombre
+            file_path = Path(values[3]) / values[0]
+            files_to_remove.append(file_path)
+
+        # Eliminar de la lista interna
+        for file_path in files_to_remove:
+            if file_path in self.selected_files:
+                self.selected_files.remove(file_path)
+        
+        # Actualizar UI
+        self._update_files_list()
+        self._update_default_output()
+        self.status_var.set(f"INFO: Se eliminaron {len(files_to_remove)} archivos de la lista")
 
     def _clear_files(self):
         """Limpia la lista de archivos."""
@@ -381,10 +442,10 @@ class DialogConverterGUI:
         header_frame.pack(fill=tk.X)
         
         if success_count == total:
-            message = f"✅ Se procesaron exitosamente {total} archivo(s)"
+            message = f"OK: Se procesaron exitosamente {total} archivo(s)"
             color = 'green'
         else:
-            message = f"⚠️ Se procesaron {success_count}/{total} archivo(s)"
+            message = f"AVISO: Se procesaron {success_count}/{total} archivo(s)"
             color = 'orange'
         
         ttk.Label(
@@ -432,13 +493,13 @@ class DialogConverterGUI:
             filename = file_path.name
             
             if success:
-                status = "✅ Éxito"
+                status = "OK"
                 changes = str(result.get('changes', 0))
                 # Guardar path del log usando el nombre de archivo como clave
                 log_file = output_dir / f"{file_path.stem}_convertido.log.txt"
                 self.result_logs[filename] = log_file
             else:
-                status = "❌ Error"
+                status = "ERROR"
                 changes = "-"
                 self.result_logs[filename] = None
             
@@ -494,7 +555,7 @@ class DialogConverterGUI:
         ).pack(side=tk.RIGHT, padx=5)
         
         # Actualizar status principal
-        self.status_var.set(f"✅ Procesamiento completado: {success_count}/{total} archivos")
+        self.status_var.set(f"OK: Procesamiento completado: {success_count}/{total} archivos")
 
     def _show_log_window(self, log_file: Path, filename: str):
         """Muestra ventana con el contenido del log formateado."""
