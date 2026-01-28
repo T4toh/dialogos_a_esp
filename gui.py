@@ -27,6 +27,7 @@ class DialogConverterGUI:
         # Variables
         self.selected_files: List[Path] = []
         self.output_dir: Optional[Path] = None
+        self.recursive_var = tk.BooleanVar(value=True)
         
         # Configurar estilo
         self.style = ttk.Style()
@@ -71,6 +72,7 @@ class DialogConverterGUI:
         buttons_frame.columnconfigure(0, weight=1)
         buttons_frame.columnconfigure(1, weight=1)
         buttons_frame.columnconfigure(2, weight=1)
+        buttons_frame.columnconfigure(3, weight=1)
         
         ttk.Button(
             buttons_frame,
@@ -83,16 +85,29 @@ class DialogConverterGUI:
             text="Seleccionar Carpeta",
             command=self._select_folder
         ).grid(row=0, column=1, padx=5, sticky=tk.EW)
+
+        ttk.Button(
+            buttons_frame,
+            text="Eliminar Seleccionados",
+            command=self._remove_selected_files
+        ).grid(row=0, column=2, padx=5, sticky=tk.EW)
         
         ttk.Button(
             buttons_frame,
             text="Limpiar Lista",
             command=self._clear_files
-        ).grid(row=0, column=2, padx=5, sticky=tk.EW)
+        ).grid(row=0, column=3, padx=5, sticky=tk.EW)
+
+        # Checkbox recursivo
+        ttk.Checkbutton(
+            main_frame,
+            text="Buscar en subcarpetas (Recursivo)",
+            variable=self.recursive_var
+        ).grid(row=3, column=0, sticky="w", padx=5)
         
         # Separator
         ttk.Separator(main_frame, orient='horizontal').grid(
-            row=3, column=0, sticky="ew", pady=5
+            row=4, column=0, sticky="ew", pady=5
         )
         
         # Frame de archivos con scrollbar
@@ -101,11 +116,11 @@ class DialogConverterGUI:
             text="Archivos seleccionados:",
             font=('Helvetica', 11, 'bold')
         )
-        files_label.grid(row=4, column=0, sticky="w", pady=(0, 5))
+        files_label.grid(row=5, column=0, sticky="w", pady=(0, 5))
         
         # Treeview para lista de archivos
         tree_frame = ttk.Frame(main_frame)
-        tree_frame.grid(row=5, column=0, sticky="nsew")
+        tree_frame.grid(row=6, column=0, sticky="nsew")
         tree_frame.columnconfigure(0, weight=1)
         tree_frame.rowconfigure(0, weight=1)
         
@@ -124,6 +139,9 @@ class DialogConverterGUI:
         vsb.config(command=self.files_tree.yview)
         hsb.config(command=self.files_tree.xview)
         
+        # Bind tecla Delete/Supr
+        self.files_tree.bind('<Delete>', lambda e: self._remove_selected_files())
+
         # Configurar columnas
         self.files_tree.heading('nombre', text='Nombre')
         self.files_tree.heading('tipo', text='Tipo')
@@ -232,7 +250,7 @@ class DialogConverterGUI:
             # Buscar recursivamente para encontrar archivos en subcarpetas
             converter = DialogConverter()
             batch = BatchProcessor(converter)
-            new_files = batch.find_files(folder_path, "*.*", recursive=True)
+            new_files = batch.find_files(folder_path, "*.*", recursive=self.recursive_var.get())
             
             for file_path in new_files:
                 if file_path not in self.selected_files:
@@ -259,6 +277,36 @@ class DialogConverterGUI:
         folder = filedialog.askdirectory(title="Seleccionar carpeta de salida")
         if folder:
             self.output_var.set(folder)
+
+    def _remove_selected_files(self):
+        """Elimina los archivos seleccionados de la lista."""
+        selected_items = self.files_tree.selection()
+        if not selected_items:
+            messagebox.showinfo("Sin selección", "Por favor, selecciona archivos para eliminar")
+            return
+
+        # Confirmación si son muchos archivos
+        if len(selected_items) > 1:
+            if not messagebox.askyesno("Confirmar", f"¿Eliminar {len(selected_items)} archivos de la lista?"):
+                return
+
+        # Identificar archivos a eliminar
+        files_to_remove = []
+        for item_id in selected_items:
+            values = self.files_tree.item(item_id, 'values')
+            # Reconstruir path: values[3] es la ruta padre, values[0] es el nombre
+            file_path = Path(values[3]) / values[0]
+            files_to_remove.append(file_path)
+
+        # Eliminar de la lista interna
+        for file_path in files_to_remove:
+            if file_path in self.selected_files:
+                self.selected_files.remove(file_path)
+        
+        # Actualizar UI
+        self._update_files_list()
+        self._update_default_output()
+        self.status_var.set(f"🗑️ Se eliminaron {len(files_to_remove)} archivos de la lista")
 
     def _clear_files(self):
         """Limpia la lista de archivos."""
