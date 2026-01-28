@@ -36,8 +36,21 @@ class DialogConverterGUI:
         # Crear UI
         self._create_widgets()
         
+        # Configurar ícono si existe
+        self._setup_icon()
+        
         # Configurar drag & drop (cross-platform)
         self._setup_drag_drop()
+
+    def _setup_icon(self):
+        """Configura el ícono de la ventana."""
+        icon_path = Path(__file__).parent / "icon.png"
+        if icon_path.exists():
+            try:
+                icon = tk.PhotoImage(file=str(icon_path))
+                self.root.iconphoto(True, icon)
+            except Exception:
+                pass  # Silently fail if icon cannot be loaded
 
     def _create_widgets(self):
         """Crea los widgets de la interfaz."""
