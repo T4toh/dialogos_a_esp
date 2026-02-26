@@ -76,3 +76,8 @@ convertidos/
 .streamlit/
 
 examples
+# AppImage build artifacts
+.appimage-tools/
+.appimage-build/
+*.AppImage
+*.AppImage.zsync

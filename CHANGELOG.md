@@ -6,6 +6,29 @@ Historial de cambios del proyecto.
 
 ---
 
+## [2.1.0] - 2026-02-26
+
+### 🎉 Cambios Mayores
+
+- **Distribución como AppImage para Linux**
+  - Ejecutable standalone que no requiere instalar Python ni dependencias
+  - Compatible con cualquier distribución Linux x86_64
+  - Generación automática via GitHub Actions en cada release (`git tag v*`)
+
+- **Auto-actualización integrada**
+  - La app avisa al arrancar si hay una nueva versión disponible
+  - Integración con [AppImageUpdate](https://github.com/AppImage/AppImageUpdate) para actualizaciones delta (zsync)
+  - Descarga solo los bloques que cambiaron, sin re-descargar el AppImage completo
+  - Banner no bloqueante con botón "Actualizar ahora"
+
+### 🔄 Cambios
+
+- `src/updater.py`: nuevo módulo de detección y aplicación de actualizaciones
+- `build_appimage.sh`: script local para construir el AppImage con PyInstaller + appimagetool
+- `.github/workflows/release.yml`: CI gratuito que publica `.AppImage` y `.AppImage.zsync` en GitHub Releases
+
+---
+
 ## [2.0.0] - 2025-12-29
 
 ### 🎉 Cambios Mayores

@@ -32,14 +32,42 @@ Como escritor, escribo mis manuscritos (los que están en español) de la manera
 - ✅ Logs detallados con estadísticas (incluye exportación JSON con offsets y metadatos)
 - ✅ **Selección de archivos nativa del sistema operativo**
 - ✅ **Sin dependencias externas** (solo Python stdlib)
+- ✅ **Distribución como AppImage** con actualizaciones automáticas
 
 ---
 
 ## Instalación
 
+### 📦 AppImage — Linux (Recomendado)
+
+Descarga el AppImage desde [GitHub Releases](https://github.com/T4toh/dialogos_a_esp/releases/latest), dale permisos y ejecútalo. No requiere instalar nada.
+
 ```bash
-git clone <repo-url>
-cd dialogos_a_español
+chmod +x Conversor-Dialogos-*.AppImage
+./Conversor-Dialogos-*.AppImage
+```
+
+La app avisa automáticamente al arrancar cuando hay una nueva versión disponible.
+
+#### Actualizaciones automáticas
+
+La app usa [AppImageUpdate](https://github.com/AppImage/AppImageUpdate/releases/latest) para descargar solo los bloques que cambiaron (vía zsync), sin re-descargar todo el archivo.
+
+1. Descarga `AppImageUpdate` y colócalo en `$PATH` o en la misma carpeta que el AppImage
+2. Al iniciar la app, si hay una nueva versión aparece un banner verde con el botón **"Actualizar ahora"**
+3. La actualización se aplica en segundo plano sin cerrar la app
+
+Para actualizar manualmente desde terminal:
+
+```bash
+AppImageUpdate Conversor-Dialogos-*.AppImage
+```
+
+### 🐍 Desde el código fuente
+
+```bash
+git clone https://github.com/T4toh/dialogos_a_esp.git
+cd dialogos_a_esp
 ```
 
 **No requiere dependencias** - Solo Python 3.11+
