@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Conversor de Diálogos
+Comment=Convierte diálogos al formato editorial español (RAE)
+Exec=conversor-dialogos
+Icon=conversor-dialogos
+Type=Application
+Categories=Office;TextEditor;
+Keywords=dialogo;español;escritura;narrativa;
+Terminal=false

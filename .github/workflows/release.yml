@@ -1,0 +1,75 @@
+name: Release AppImage
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write  # Necesario para crear releases y subir artefactos
+
+jobs:
+  build-appimage:
+    name: Build & Publish AppImage
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias del sistema
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y zsync python3-tk python3-pip
+          python3 -m pip install pyinstaller --quiet
+
+      - name: Obtener versión del proyecto
+        id: version
+        run: |
+          VERSION=$(python3 -c "from src import __version__; print(__version__)")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Versión detectada: ${VERSION}"
+
+      - name: Construir AppImage
+        run: |
+          chmod +x build_appimage.sh
+          ./build_appimage.sh
+
+      - name: Verificar artefactos generados
+        run: |
+          ls -lh Conversor-Dialogos-*.AppImage Conversor-Dialogos-*.AppImage.zsync
+          # Verificar que el AppImage arranca (sin GUI, solo --appimage-version)
+          chmod +x Conversor-Dialogos-*.AppImage
+          ./Conversor-Dialogos-*.AppImage --appimage-version || true
+
+      - name: Publicar en GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Conversor de Diálogos v${{ steps.version.outputs.version }}"
+          body: |
+            ## Conversor de Diálogos v${{ steps.version.outputs.version }}
+
+            ### Instalación
+            1. Descarga el `.AppImage`
+            2. Dale permisos de ejecución: `chmod +x Conversor-Dialogos-*.AppImage`
+            3. Ejecútalo: `./Conversor-Dialogos-*.AppImage`
+
+            ### Actualización
+            La app avisará automáticamente cuando haya una nueva versión.
+            Puedes actualizar con [AppImageUpdate](https://github.com/AppImage/AppImageUpdate/releases):
+            ```bash
+            AppImageUpdate Conversor-Dialogos-*.AppImage
+            ```
+          draft: false
+          prerelease: false
+          files: |
+            Conversor-Dialogos-*.AppImage
+            Conversor-Dialogos-*.AppImage.zsync
+          fail_on_unmatched_files: true

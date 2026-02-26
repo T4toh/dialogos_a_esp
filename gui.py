@@ -4,6 +4,7 @@ Interfaz gráfica con Tkinter para el conversor de diálogos.
 
 import platform
 import subprocess
+import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -11,6 +12,7 @@ from typing import List, Optional
 
 from src.batch_processor import BatchProcessor
 from src.converter import DialogConverter
+from src import updater
 
 
 class DialogConverterGUI:
@@ -41,6 +43,96 @@ class DialogConverterGUI:
 
         # Configurar drag & drop (cross-platform)
         self._setup_drag_drop()
+
+        # Comprobar actualizaciones al arrancar (solo cuando corre como AppImage)
+        if updater.is_running_as_appimage():
+            threading.Thread(target=self._check_updates_async, daemon=True).start()
+
+    def _check_updates_async(self):
+        """Comprueba actualizaciones en segundo plano y notifica si hay alguna."""
+        result = updater.check_for_updates()
+        if result.get("available"):
+            # Volver al hilo principal de Tkinter para mostrar el banner
+            self.root.after(0, self._show_update_banner)
+        elif result.get("error") and not result.get("tool_found"):
+            # AppImageUpdate no instalado: no molestar al usuario (silencio)
+            pass
+
+    def _show_update_banner(self):
+        """Muestra un banner no bloqueante en la parte superior cuando hay update."""
+        banner = tk.Frame(self.root, bg="#2e7d32", pady=4)
+        banner.pack(side="top", fill="x", before=self.root.winfo_children()[0])
+
+        tk.Label(
+            banner,
+            text="🔄 Hay una nueva versión disponible.",
+            bg="#2e7d32",
+            fg="white",
+            font=("", 10),
+        ).pack(side="left", padx=(12, 8))
+
+        tk.Button(
+            banner,
+            text="Actualizar ahora",
+            command=lambda: self._apply_update(banner),
+            bg="#1b5e20",
+            fg="white",
+            relief="flat",
+            cursor="hand2",
+            padx=8,
+        ).pack(side="left")
+
+        tk.Button(
+            banner,
+            text="✕",
+            command=banner.destroy,
+            bg="#2e7d32",
+            fg="white",
+            relief="flat",
+            cursor="hand2",
+        ).pack(side="right", padx=4)
+
+    def _apply_update(self, banner: tk.Frame):
+        """Lanza la descarga/instalación de la actualización en segundo plano."""
+        tool_found = updater.find_appimageupdate() is not None
+        if not tool_found:
+            messagebox.showinfo(
+                "AppImageUpdate no encontrado",
+                f"Para actualizar automáticamente instala AppImageUpdate:\n\n"
+                f"{updater.APPIMAGEUPDATE_DOWNLOAD_URL}\n\n"
+                "O descarga la nueva versión manualmente desde GitHub Releases.",
+            )
+            return
+
+        banner.destroy()
+
+        # Deshabilitar interacción mientras actualiza
+        progress_win = tk.Toplevel(self.root)
+        progress_win.title("Actualizando...")
+        progress_win.resizable(False, False)
+        progress_win.grab_set()
+        tk.Label(progress_win, text="Descargando actualización…\nEsto puede tardar unos segundos.", padx=20, pady=16).pack()
+        bar = ttk.Progressbar(progress_win, mode="indeterminate", length=280)
+        bar.pack(padx=20, pady=(0, 16))
+        bar.start()
+
+        def _do_update():
+            result = updater.apply_update()
+            bar.stop()
+            progress_win.destroy()
+            if result["success"]:
+                messagebox.showinfo(
+                    "Actualización completada",
+                    "La actualización se descargó correctamente.\n"
+                    "Reinicia la app para usar la nueva versión.",
+                )
+            else:
+                messagebox.showerror(
+                    "Error al actualizar",
+                    f"No se pudo completar la actualización:\n{result.get('error', 'Error desconocido')}",
+                )
+
+        threading.Thread(target=_do_update, daemon=True).start()
 
     def _setup_icon(self):
         """Configura el ícono de la ventana."""

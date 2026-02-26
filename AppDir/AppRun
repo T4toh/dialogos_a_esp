@@ -1,0 +1,24 @@
+#!/bin/bash
+# AppRun - Punto de entrada del AppImage
+# Se ejecuta cuando el usuario lanza el AppImage
+
+set -e
+
+# Directorio donde está montado el AppImage
+APPDIR="$(dirname "$(readlink -f "${0}")")"
+
+# Añadir Python del AppImage al PATH
+export PATH="${APPDIR}/usr/bin:${PATH}"
+
+# Variables para que Python encuentre sus librerías
+export PYTHONHOME="${APPDIR}/usr"
+export PYTHONPATH="${APPDIR}/usr/lib/python3.11:${APPDIR}/usr/lib/python3.11/lib-dynload"
+
+# Librerías compartidas (Tkinter necesita las del sistema, las del AppImage son respaldo)
+export LD_LIBRARY_PATH="${APPDIR}/usr/lib:${LD_LIBRARY_PATH}"
+
+# Directorio de la app (fuentes Python)
+APP_SRC="${APPDIR}/app"
+
+# Ejecutar la GUI
+exec "${APPDIR}/usr/bin/python3" "${APP_SRC}/gui.py" "$@"
