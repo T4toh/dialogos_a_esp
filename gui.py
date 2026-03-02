@@ -62,7 +62,7 @@ class DialogConverterGUI:
             result = updater.check_for_updates()
 
             def _done():
-                self.update_btn.config(state="normal", text="🔄 Buscar actualización")
+                self.update_btn.config(state="normal", text="Buscar actualización")
                 if result.get("available"):
                     self._show_update_banner(result)
                 elif result.get("error"):
@@ -325,7 +325,7 @@ class DialogConverterGUI:
 
         self.update_btn = ttk.Button(
             bottom_frame,
-            text="🔄 Buscar actualización",
+            text="Buscar actualización",
             command=self._manual_check_update,
         )
         self.update_btn.grid(row=0, column=1, sticky="e")
