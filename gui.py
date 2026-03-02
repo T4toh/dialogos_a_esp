@@ -207,26 +207,36 @@ class DialogConverterGUI:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(7, weight=1)  # fila de la lista de archivos
+        main_frame.rowconfigure(6, weight=1)  # fila del treeview se expande
 
-        # Header (row=1)
-        header = ttk.Label(
-            main_frame,
+        # Header row: título + botón de actualización a la derecha (row=1)
+        header_frame = ttk.Frame(main_frame)
+        header_frame.grid(row=1, column=0, sticky="ew", pady=(0, 2))
+        header_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(
+            header_frame,
             text="Conversor de Diálogos a Español",
             font=("Helvetica", 16, "bold"),
-        )
-        header.grid(row=1, column=0, pady=(0, 10), sticky=tk.W)
+        ).grid(row=0, column=0, sticky="w")
 
-        subtitle = ttk.Label(
+        self.update_btn = ttk.Button(
+            header_frame,
+            text="Buscar actualización",
+            command=self._manual_check_update,
+        )
+        self.update_btn.grid(row=0, column=1, sticky="e")
+
+        # Subtítulo (row=2)
+        ttk.Label(
             main_frame,
             text="Convierte diálogos con comillas al formato español con raya (—)",
             font=("Helvetica", 10),
-        )
-        subtitle.grid(row=1, column=0, pady=(0, 10), sticky=tk.W)
+        ).grid(row=2, column=0, pady=(0, 10), sticky=tk.W)
 
-        # Botones de selección (centrados, sin emojis)
+        # Botones de selección (row=3)
         buttons_frame = ttk.Frame(main_frame)
-        buttons_frame.grid(row=2, column=0, sticky=tk.EW, pady=(0, 5))
+        buttons_frame.grid(row=3, column=0, sticky=tk.EW, pady=(0, 5))
         buttons_frame.columnconfigure(0, weight=1)
         buttons_frame.columnconfigure(1, weight=1)
         buttons_frame.columnconfigure(2, weight=1)
@@ -255,11 +265,11 @@ class DialogConverterGUI:
             main_frame,
             text="Buscar en subcarpetas (Recursivo)",
             variable=self.recursive_var,
-        ).grid(row=3, column=0, sticky="w", padx=5, pady=2)
+        ).grid(row=4, column=0, sticky="w", padx=5, pady=2)
 
         # Separator
         ttk.Separator(main_frame, orient="horizontal").grid(
-            row=4, column=0, sticky="ew", pady=5
+            row=5, column=0, sticky="ew", pady=5
         )
 
         # Frame de archivos con scrollbar
@@ -330,25 +340,13 @@ class DialogConverterGUI:
         self.progress = ttk.Progressbar(main_frame, mode="determinate", length=300)
         self.progress.grid(row=8, column=0, sticky="ew", pady=(10, 5))
 
-        # Fila inferior: status + botón de actualización
-        bottom_frame = ttk.Frame(main_frame)
-        bottom_frame.grid(row=9, column=0, sticky="ew", pady=(8, 0))
-        bottom_frame.columnconfigure(0, weight=1)
-
+        # Status label
         self.status_var = tk.StringVar(value="Listo para procesar archivos")
-        status_label = ttk.Label(
-            bottom_frame, textvariable=self.status_var, font=("Helvetica", 9)
-        )
-        status_label.grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            main_frame, textvariable=self.status_var, font=("Helvetica", 9)
+        ).grid(row=9, column=0, sticky="w")
 
-        self.update_btn = ttk.Button(
-            bottom_frame,
-            text="Buscar actualización",
-            command=self._manual_check_update,
-        )
-        self.update_btn.grid(row=0, column=1, sticky="e")
-
-        # Botón procesar (con sticky para que ocupe todo el ancho, sin emoji)
+        # Botón procesar
         process_button = ttk.Button(
             main_frame,
             text="Procesar Archivos",
