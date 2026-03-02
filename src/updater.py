@@ -2,19 +2,24 @@
 src/updater.py - Módulo de auto-actualización para AppImage.
 
 Solo activo cuando la app se ejecuta como AppImage (variable de entorno $APPIMAGE).
-Usa AppImageUpdate para descargar solo los bloques cambiados vía zsync.
+Usa la API de GitHub para detectar nuevas versiones y las descarga directamente,
+sin depender de herramientas externas como AppImageUpdate.
 """
 
 import os
 import shutil
-import subprocess
+import urllib.request
+import json
 from typing import Optional
 
+from src import __version__
 
-# URL de descarga de AppImageUpdate para mostrar al usuario si no lo tiene
-APPIMAGEUPDATE_DOWNLOAD_URL = (
-    "https://github.com/AppImage/AppImageUpdate/releases/latest"
-)
+GITHUB_REPO = "T4toh/dialogos_a_esp"
+GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+GITHUB_RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases/latest"
+
+# URL de descarga de AppImageUpdate (para compatibilidad, ya no requerido)
+APPIMAGEUPDATE_DOWNLOAD_URL = GITHUB_RELEASES_URL
 
 
 def is_running_as_appimage() -> bool:
@@ -28,108 +33,119 @@ def get_appimage_path() -> Optional[str]:
 
 
 def find_appimageupdate() -> Optional[str]:
-    """
-    Busca el ejecutable AppImageUpdate.
-    Busca primero junto al AppImage, luego en $PATH.
-    """
+    """Busca AppImageUpdate en el directorio del AppImage o en $PATH (opcional)."""
     appimage_path = get_appimage_path()
     if appimage_path:
-        # Buscar AppImageUpdate en el mismo directorio que el AppImage
-        appimage_dir = os.path.dirname(appimage_path)
-        candidate = os.path.join(appimage_dir, "AppImageUpdate")
+        candidate = os.path.join(os.path.dirname(appimage_path), "AppImageUpdate")
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
             return candidate
-
     return shutil.which("AppImageUpdate")
+
+
+def _fetch_latest_release() -> dict:
+    """
+    Consulta la API de GitHub y devuelve info de la última release.
+    Lanza excepción si falla la conexión.
+    """
+    req = urllib.request.Request(
+        GITHUB_API_URL,
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "dialogos-updater"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode())
 
 
 def check_for_updates() -> dict:
     """
-    Comprueba si hay una actualización disponible sin descargar nada.
+    Comprueba si hay una actualización disponible comparando versiones con GitHub.
 
     Returns:
         dict con claves:
           - 'available' (bool): hay actualización
-          - 'tool_found' (bool): AppImageUpdate está instalado
+          - 'latest_version' (str | None): versión más reciente en GitHub
+          - 'download_url' (str | None): URL directa del nuevo AppImage
           - 'is_appimage' (bool): se está ejecutando como AppImage
           - 'error' (str | None): mensaje de error si falló el check
     """
     result = {
         "available": False,
-        "tool_found": False,
+        "latest_version": None,
+        "download_url": None,
         "is_appimage": is_running_as_appimage(),
         "error": None,
     }
 
-    if not result["is_appimage"]:
-        return result
-
-    tool = find_appimageupdate()
-    if not tool:
-        result["error"] = "AppImageUpdate no encontrado"
-        return result
-
-    result["tool_found"] = True
-    appimage_path = get_appimage_path()
-
     try:
-        # --check-for-update: sale con código 1 si hay update, 0 si no hay
-        proc = subprocess.run(
-            [tool, "--check-for-update", appimage_path],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        result["available"] = proc.returncode == 1
-    except subprocess.TimeoutExpired:
-        result["error"] = "Timeout al comprobar actualizaciones"
+        release = _fetch_latest_release()
+        tag = release.get("tag_name", "").lstrip("v")
+        result["latest_version"] = tag
+
+        # Comparación simple de versiones (ej: "2.1.1" > "2.1.0")
+        def parse(v: str):
+            return tuple(int(x) for x in v.split(".") if x.isdigit())
+
+        if parse(tag) > parse(__version__):
+            result["available"] = True
+            # Buscar el asset .AppImage para x86_64
+            for asset in release.get("assets", []):
+                name = asset.get("name", "")
+                if name.endswith(".AppImage") and "x86_64" in name and not name.endswith(".zsync"):
+                    result["download_url"] = asset["browser_download_url"]
+                    break
+
     except Exception as e:
         result["error"] = str(e)
 
     return result
 
 
-def apply_update() -> dict:
+def apply_update(download_url: str, progress_callback=None) -> dict:
     """
-    Descarga y aplica la actualización usando AppImageUpdate.
+    Descarga el nuevo AppImage y reemplaza el actual.
+    Llama a progress_callback(bytes_done, total_bytes) durante la descarga.
     Bloquea hasta que termina (llamar desde un hilo separado).
 
     Returns:
         dict con claves:
           - 'success' (bool)
-          - 'output' (str): salida del proceso
           - 'error' (str | None)
     """
-    result = {"success": False, "output": "", "error": None}
+    result = {"success": False, "error": None}
 
-    if not is_running_as_appimage():
+    appimage_path = get_appimage_path()
+    if not appimage_path:
         result["error"] = "No se está ejecutando como AppImage"
         return result
 
-    tool = find_appimageupdate()
-    if not tool:
-        result["error"] = (
-            f"AppImageUpdate no encontrado.\n"
-            f"Descárgalo en: {APPIMAGEUPDATE_DOWNLOAD_URL}"
-        )
-        return result
-
-    appimage_path = get_appimage_path()
+    tmp_path = appimage_path + ".new"
 
     try:
-        proc = subprocess.run(
-            [tool, appimage_path],
-            capture_output=True,
-            text=True,
-            timeout=120,
+        req = urllib.request.Request(
+            download_url,
+            headers={"User-Agent": "dialogos-updater"},
         )
-        result["output"] = proc.stdout + proc.stderr
-        result["success"] = proc.returncode == 0
-        if not result["success"]:
-            result["error"] = f"AppImageUpdate salió con código {proc.returncode}"
-    except subprocess.TimeoutExpired:
-        result["error"] = "Timeout al descargar la actualización"
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            total = int(resp.headers.get("Content-Length", 0))
+            done = 0
+            chunk = 65536
+            with open(tmp_path, "wb") as f:
+                while True:
+                    data = resp.read(chunk)
+                    if not data:
+                        break
+                    f.write(data)
+                    done += len(data)
+                    if progress_callback:
+                        progress_callback(done, total)
+
+        # Dar permisos de ejecución y reemplazar el AppImage actual
+        os.chmod(tmp_path, 0o755)
+        shutil.move(tmp_path, appimage_path)
+        result["success"] = True
+
     except Exception as e:
         result["error"] = str(e)
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
     return result

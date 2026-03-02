@@ -52,9 +52,7 @@ class DialogConverterGUI:
         """Comprueba actualizaciones en segundo plano y notifica si hay alguna."""
         result = updater.check_for_updates()
         if result.get("available"):
-            self.root.after(0, self._show_update_banner)
-        elif result.get("error") and not result.get("tool_found"):
-            pass
+            self.root.after(0, lambda: self._show_update_banner(result))
 
     def _manual_check_update(self):
         """Disparado por el botón: comprueba actualizaciones y da feedback visible."""
@@ -66,24 +64,18 @@ class DialogConverterGUI:
             def _done():
                 self.update_btn.config(state="normal", text="🔄 Buscar actualización")
                 if result.get("available"):
-                    self._show_update_banner()
+                    self._show_update_banner(result)
+                elif result.get("error"):
+                    messagebox.showwarning(
+                        "Error al verificar",
+                        f"No se pudo comprobar actualizaciones:\n{result['error']}",
+                    )
                 elif not result.get("is_appimage"):
                     messagebox.showinfo(
                         "Actualizaciones",
                         "No estás corriendo la app como AppImage.\n"
                         "Descargá la última versión desde:\n"
-                        "https://github.com/T4toh/dialogos_a_esp/releases/latest",
-                    )
-                elif not result.get("tool_found"):
-                    messagebox.showinfo(
-                        "AppImageUpdate no encontrado",
-                        f"Para actualizaciones automáticas, instalá AppImageUpdate:\n\n"
-                        f"{updater.APPIMAGEUPDATE_DOWNLOAD_URL}",
-                    )
-                elif result.get("error"):
-                    messagebox.showwarning(
-                        "Error al verificar",
-                        f"No se pudo comprobar actualizaciones:\n{result['error']}",
+                        f"{updater.GITHUB_RELEASES_URL}",
                     )
                 else:
                     messagebox.showinfo(
@@ -94,14 +86,15 @@ class DialogConverterGUI:
 
         threading.Thread(target=_check, daemon=True).start()
 
-    def _show_update_banner(self):
+    def _show_update_banner(self, check_result: dict):
         """Muestra un banner no bloqueante en la parte superior cuando hay update."""
+        latest = check_result.get("latest_version", "")
         banner = tk.Frame(self.root, bg="#2e7d32", pady=4)
         banner.pack(side="top", fill="x", before=self.root.winfo_children()[0])
 
         tk.Label(
             banner,
-            text="🔄 Hay una nueva versión disponible.",
+            text=f"🔄 Nueva versión disponible: v{latest}",
             bg="#2e7d32",
             fg="white",
             font=("", 10),
@@ -110,7 +103,7 @@ class DialogConverterGUI:
         tk.Button(
             banner,
             text="Actualizar ahora",
-            command=lambda: self._apply_update(banner),
+            command=lambda: self._apply_update(banner, check_result),
             bg="#1b5e20",
             fg="white",
             relief="flat",
@@ -128,39 +121,45 @@ class DialogConverterGUI:
             cursor="hand2",
         ).pack(side="right", padx=4)
 
-    def _apply_update(self, banner: tk.Frame):
-        """Lanza la descarga/instalación de la actualización en segundo plano."""
-        tool_found = updater.find_appimageupdate() is not None
-        if not tool_found:
+    def _apply_update(self, banner: tk.Frame, check_result: dict):
+        """Descarga el nuevo AppImage y reemplaza el actual."""
+        download_url = check_result.get("download_url")
+        if not download_url:
             messagebox.showinfo(
-                "AppImageUpdate no encontrado",
-                f"Para actualizar automáticamente instala AppImageUpdate:\n\n"
-                f"{updater.APPIMAGEUPDATE_DOWNLOAD_URL}\n\n"
-                "O descarga la nueva versión manualmente desde GitHub Releases.",
+                "Actualización",
+                f"No se encontró el archivo de descarga automática.\n"
+                f"Descargalo manualmente desde:\n{updater.GITHUB_RELEASES_URL}",
             )
             return
 
         banner.destroy()
 
-        # Deshabilitar interacción mientras actualiza
         progress_win = tk.Toplevel(self.root)
         progress_win.title("Actualizando...")
         progress_win.resizable(False, False)
         progress_win.grab_set()
-        tk.Label(progress_win, text="Descargando actualización…\nEsto puede tardar unos segundos.", padx=20, pady=16).pack()
-        bar = ttk.Progressbar(progress_win, mode="indeterminate", length=280)
-        bar.pack(padx=20, pady=(0, 16))
-        bar.start()
+        tk.Label(progress_win, text="Descargando actualización…", padx=20, pady=12).pack()
+        bar = ttk.Progressbar(progress_win, mode="determinate", length=300, maximum=100)
+        bar.pack(padx=20, pady=(0, 4))
+        size_label = tk.Label(progress_win, text="", padx=20)
+        size_label.pack(pady=(0, 12))
+
+        def _progress(done, total):
+            if total:
+                pct = int(done / total * 100)
+                mb_done = done / 1_048_576
+                mb_total = total / 1_048_576
+                self.root.after(0, lambda: bar.config(value=pct))
+                self.root.after(0, lambda: size_label.config(text=f"{mb_done:.1f} / {mb_total:.1f} MB"))
 
         def _do_update():
-            result = updater.apply_update()
-            bar.stop()
-            progress_win.destroy()
+            result = updater.apply_update(download_url, progress_callback=_progress)
+            self.root.after(0, progress_win.destroy)
             if result["success"]:
                 messagebox.showinfo(
                     "Actualización completada",
-                    "La actualización se descargó correctamente.\n"
-                    "Reinicia la app para usar la nueva versión.",
+                    "✅ Actualización descargada correctamente.\n"
+                    "Reiniciá la app para usar la nueva versión.",
                 )
             else:
                 messagebox.showerror(
