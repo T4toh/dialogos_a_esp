@@ -89,21 +89,27 @@ class DialogConverterGUI:
     def _show_update_banner(self, check_result: dict):
         """Muestra un banner no bloqueante en la parte superior cuando hay update."""
         latest = check_result.get("latest_version", "")
-        banner = tk.Frame(self.root, bg="#2e7d32", pady=4)
-        banner.pack(side="top", fill="x", before=self.root.winfo_children()[0])
+
+        # Destruir contenido previo del banner_row y rellenarlo
+        for w in self._banner_row.winfo_children():
+            w.destroy()
+
+        self._banner_row.config(bg="#2e7d32")
+        inner = tk.Frame(self._banner_row, bg="#2e7d32", pady=4)
+        inner.pack(fill="x")
 
         tk.Label(
-            banner,
-            text=f"🔄 Nueva versión disponible: v{latest}",
+            inner,
+            text=f"Nueva versión disponible: v{latest}",
             bg="#2e7d32",
             fg="white",
             font=("", 10),
         ).pack(side="left", padx=(12, 8))
 
         tk.Button(
-            banner,
+            inner,
             text="Actualizar ahora",
-            command=lambda: self._apply_update(banner, check_result),
+            command=lambda: self._apply_update(self._banner_row, check_result),
             bg="#1b5e20",
             fg="white",
             relief="flat",
@@ -111,10 +117,15 @@ class DialogConverterGUI:
             padx=8,
         ).pack(side="left")
 
+        def _hide():
+            for w in self._banner_row.winfo_children():
+                w.destroy()
+            self._banner_row.config(bg="")
+
         tk.Button(
-            banner,
+            inner,
             text="✕",
-            command=banner.destroy,
+            command=_hide,
             bg="#2e7d32",
             fg="white",
             relief="flat",
@@ -132,7 +143,9 @@ class DialogConverterGUI:
             )
             return
 
-        banner.destroy()
+        for w in self._banner_row.winfo_children():
+            w.destroy()
+        self._banner_row.config(bg="")
 
         progress_win = tk.Toplevel(self.root)
         progress_win.title("Actualizando...")
@@ -182,22 +195,27 @@ class DialogConverterGUI:
     def _create_widgets(self):
         """Crea los widgets de la interfaz."""
         # Frame principal con padding
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky="nsew")
+        self._main_frame = ttk.Frame(self.root, padding="10")
+        self._main_frame.grid(row=0, column=0, sticky="nsew")
+        main_frame = self._main_frame
+
+        # Fila 0 reservada para el banner de actualizaciones (oculta si no hay update)
+        self._banner_row = tk.Frame(main_frame)  # vacío por defecto
+        self._banner_row.grid(row=0, column=0, sticky="ew")
 
         # Configurar grid
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(6, weight=1)
+        main_frame.rowconfigure(7, weight=1)  # fila de la lista de archivos
 
-        # Header
+        # Header (row=1)
         header = ttk.Label(
             main_frame,
             text="Conversor de Diálogos a Español",
             font=("Helvetica", 16, "bold"),
         )
-        header.grid(row=0, column=0, pady=(0, 10), sticky=tk.W)
+        header.grid(row=1, column=0, pady=(0, 10), sticky=tk.W)
 
         subtitle = ttk.Label(
             main_frame,
