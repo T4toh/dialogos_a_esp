@@ -52,11 +52,47 @@ class DialogConverterGUI:
         """Comprueba actualizaciones en segundo plano y notifica si hay alguna."""
         result = updater.check_for_updates()
         if result.get("available"):
-            # Volver al hilo principal de Tkinter para mostrar el banner
             self.root.after(0, self._show_update_banner)
         elif result.get("error") and not result.get("tool_found"):
-            # AppImageUpdate no instalado: no molestar al usuario (silencio)
             pass
+
+    def _manual_check_update(self):
+        """Disparado por el botón: comprueba actualizaciones y da feedback visible."""
+        self.update_btn.config(state="disabled", text="Buscando...")
+
+        def _check():
+            result = updater.check_for_updates()
+
+            def _done():
+                self.update_btn.config(state="normal", text="🔄 Buscar actualización")
+                if result.get("available"):
+                    self._show_update_banner()
+                elif not result.get("is_appimage"):
+                    messagebox.showinfo(
+                        "Actualizaciones",
+                        "No estás corriendo la app como AppImage.\n"
+                        "Descargá la última versión desde:\n"
+                        "https://github.com/T4toh/dialogos_a_esp/releases/latest",
+                    )
+                elif not result.get("tool_found"):
+                    messagebox.showinfo(
+                        "AppImageUpdate no encontrado",
+                        f"Para actualizaciones automáticas, instalá AppImageUpdate:\n\n"
+                        f"{updater.APPIMAGEUPDATE_DOWNLOAD_URL}",
+                    )
+                elif result.get("error"):
+                    messagebox.showwarning(
+                        "Error al verificar",
+                        f"No se pudo comprobar actualizaciones:\n{result['error']}",
+                    )
+                else:
+                    messagebox.showinfo(
+                        "Actualizaciones", "✅ Ya tenés la versión más reciente."
+                    )
+
+            self.root.after(0, _done)
+
+        threading.Thread(target=_check, daemon=True).start()
 
     def _show_update_banner(self):
         """Muestra un banner no bloqueante en la parte superior cuando hay update."""
@@ -277,12 +313,23 @@ class DialogConverterGUI:
         self.progress = ttk.Progressbar(main_frame, mode="determinate", length=300)
         self.progress.grid(row=8, column=0, sticky="ew", pady=(10, 5))
 
-        # Status label
+        # Fila inferior: status + botón de actualización
+        bottom_frame = ttk.Frame(main_frame)
+        bottom_frame.grid(row=9, column=0, sticky="ew", pady=(8, 0))
+        bottom_frame.columnconfigure(0, weight=1)
+
         self.status_var = tk.StringVar(value="Listo para procesar archivos")
         status_label = ttk.Label(
-            main_frame, textvariable=self.status_var, font=("Helvetica", 9)
+            bottom_frame, textvariable=self.status_var, font=("Helvetica", 9)
         )
-        status_label.grid(row=9, column=0, sticky="w")
+        status_label.grid(row=0, column=0, sticky="w")
+
+        self.update_btn = ttk.Button(
+            bottom_frame,
+            text="🔄 Buscar actualización",
+            command=self._manual_check_update,
+        )
+        self.update_btn.grid(row=0, column=1, sticky="e")
 
         # Botón procesar (con sticky para que ocupe todo el ancho, sin emoji)
         process_button = ttk.Button(
