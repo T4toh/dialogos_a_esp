@@ -88,6 +88,7 @@ fi
 mkdir -p "${TOOLS_DIR}" "${BUILD_DIR}"
 
 # Función helper: ejecuta un AppImage desde /tmp para evitar noexec en el fs del repo
+# APPIMAGE_EXTRACT_AND_RUN=1 permite correrlo sin FUSE (necesario en CI/contenedores)
 run_appimage() {
     local src="$1"
     shift
@@ -95,7 +96,7 @@ run_appimage() {
     tmp=$(mktemp /tmp/appimage-tool-XXXXX)
     cp "${src}" "${tmp}"
     chmod +x "${tmp}"
-    "${tmp}" "$@"
+    APPIMAGE_EXTRACT_AND_RUN=1 "${tmp}" "$@"
     local rc=$?
     rm -f "${tmp}"
     return ${rc}
