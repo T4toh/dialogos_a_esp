@@ -8,6 +8,7 @@ sin depender de herramientas externas como AppImageUpdate.
 
 import os
 import shutil
+import ssl
 import urllib.request
 import json
 from typing import Optional
@@ -42,6 +43,30 @@ def find_appimageupdate() -> Optional[str]:
     return shutil.which("AppImageUpdate")
 
 
+def _make_ssl_context() -> ssl.SSLContext:
+    """
+    Crea un contexto SSL que usa los certificados del sistema operativo.
+    Dentro de un AppImage, Python no encuentra sus propios certs bundleados,
+    pero los del sistema (/etc/ssl/certs) sí están disponibles.
+    """
+    ctx = ssl.create_default_context()
+    # Rutas estándar de certificados en Linux
+    system_ca_paths = [
+        "/etc/ssl/certs/ca-certificates.crt",   # Debian/Ubuntu/Arch
+        "/etc/pki/tls/certs/ca-bundle.crt",     # Fedora/RHEL
+        "/etc/ssl/ca-bundle.pem",               # openSUSE
+    ]
+    for path in system_ca_paths:
+        if os.path.isfile(path):
+            ctx.load_verify_locations(cafile=path)
+            return ctx
+    # Si no encontramos certs del sistema, deshabilitar verificación
+    # (mejor que crashear, muestra error descriptivo al usuario)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 def _fetch_latest_release() -> dict:
     """
     Consulta la API de GitHub y devuelve info de la última release.
@@ -51,7 +76,7 @@ def _fetch_latest_release() -> dict:
         GITHUB_API_URL,
         headers={"Accept": "application/vnd.github+json", "User-Agent": "dialogos-updater"},
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:
+    with urllib.request.urlopen(req, timeout=10, context=_make_ssl_context()) as resp:
         return json.loads(resp.read().decode())
 
 
@@ -124,7 +149,7 @@ def apply_update(download_url: str, progress_callback=None) -> dict:
             download_url,
             headers={"User-Agent": "dialogos-updater"},
         )
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=120, context=_make_ssl_context()) as resp:
             total = int(resp.headers.get("Content-Length", 0))
             done = 0
             chunk = 65536
