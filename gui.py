@@ -347,13 +347,13 @@ class DialogConverterGUI:
         ).grid(row=9, column=0, sticky="w")
 
         # Botón procesar
-        process_button = ttk.Button(
+        self.process_btn = ttk.Button(
             main_frame,
             text="Procesar Archivos",
             command=self._process_files,
             style="Accent.TButton",
         )
-        process_button.grid(row=10, column=0, pady=(15, 0), sticky="ew")
+        self.process_btn.grid(row=10, column=0, pady=(15, 0), sticky="ew")
 
         # Configurar estilo del botón
         self.style.configure(
@@ -504,7 +504,7 @@ class DialogConverterGUI:
         return f"{size:.1f} TB"
 
     def _process_files(self):
-        """Procesa los archivos seleccionados usando BatchProcessor."""
+        """Procesa los archivos seleccionados usando BatchProcessor (en hilo secundario)."""
         if not self.selected_files:
             messagebox.showwarning(
                 "Sin archivos",
@@ -522,49 +522,63 @@ class DialogConverterGUI:
 
         output_path.mkdir(parents=True, exist_ok=True)
 
-        # Reiniciar progreso
+        # Reiniciar progreso y deshabilitar botón
         self.progress["maximum"] = len(self.selected_files)
         self.progress["value"] = 0
+        self.process_btn.config(state="disabled")
 
-        # Callback para actualizar UI
+        # Callback thread-safe para actualizar UI desde el hilo secundario
         def update_progress(current, total, filename):
-            self.status_var.set(f"Procesando {current}/{total}: {filename}")
-            self.progress["value"] = current
-            self.root.update_idletasks()
-
-        try:
-            # Usar BatchProcessor (incluye backup automático)
-            converter = DialogConverter()
-            batch = BatchProcessor(converter)
-
-            results_list = batch.process_files(
-                files=self.selected_files,
-                output_dir=output_path,
-                progress_callback=update_progress,
+            self.root.after(
+                0,
+                lambda c=current, t=total, f=filename: (
+                    self.status_var.set(f"Procesando {c}/{t}: {f}"),
+                    self.progress.config(value=c),
+                ),
             )
 
-            # Convertir formato de resultados para _show_results
-            results = []
-            for result in results_list:
-                if result["success"]:
-                    results.append((Path(result["file"]), True, result))
-                else:
-                    results.append(
-                        (
-                            Path(result["file"]),
-                            False,
-                            result.get("error", "Error desconocido"),
+        def run_in_thread():
+            try:
+                converter = DialogConverter()
+                batch = BatchProcessor(converter)
+
+                results_list = batch.process_files(
+                    files=self.selected_files,
+                    output_dir=output_path,
+                    progress_callback=update_progress,
+                )
+
+                results = []
+                for result in results_list:
+                    if result["success"]:
+                        results.append((Path(result["file"]), True, result))
+                    else:
+                        results.append(
+                            (
+                                Path(result["file"]),
+                                False,
+                                result.get("error", "Error desconocido"),
+                            )
                         )
-                    )
 
-        except Exception as e:
-            messagebox.showerror(
-                "Error", f"Error durante el procesamiento:\n\n{str(e)}"
-            )
-            return
+                self.root.after(0, lambda: self._on_processing_done(results, output_path))
 
-        # Mostrar resumen
+            except Exception as e:
+                self.root.after(0, lambda err=e: self._on_processing_error(err))
+
+        threading.Thread(target=run_in_thread, daemon=True).start()
+
+    def _on_processing_done(self, results: List, output_path: Path):
+        """Llamado en el hilo principal cuando el procesamiento termina con éxito."""
+        self.process_btn.config(state="normal")
         self._show_results(results, output_path)
+
+    def _on_processing_error(self, error: Exception):
+        """Llamado en el hilo principal si el procesamiento falla."""
+        self.process_btn.config(state="normal")
+        messagebox.showerror(
+            "Error", f"Error durante el procesamiento:\n\n{str(error)}"
+        )
 
     def _show_results(self, results: List, output_dir: Path):
         """Muestra resumen de resultados con opción de ver logs."""
