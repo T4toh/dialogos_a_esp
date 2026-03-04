@@ -611,7 +611,7 @@ class DialogConverterGUI:
 
         ttk.Label(
             header_frame,
-            text=f"📁 Archivos guardados en: {output_dir}",
+            text=f"Archivos guardados en: {output_dir}",
             font=("Helvetica", 9),
         ).pack(pady=(5, 0))
 
@@ -918,6 +918,19 @@ class DialogConverterGUI:
 def main():
     """Punto de entrada de la aplicación."""
     root = tk.Tk()
+
+    # En PyInstaller --windowed las excepciones en callbacks se swallowean
+    # silenciosamente. Este handler las muestra como messagebox en vez de cerrar.
+    import traceback
+
+    def _report_callback_exception(exc, val, tb):
+        messagebox.showerror(
+            "Error inesperado",
+            f"{exc.__name__}: {val}\n\n{traceback.format_exc()}",
+        )
+
+    root.report_callback_exception = _report_callback_exception
+
     DialogConverterGUI(root)
     root.mainloop()
 
