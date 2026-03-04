@@ -120,7 +120,7 @@ class DialogConverterGUI:
         def _hide():
             for w in self._banner_row.winfo_children():
                 w.destroy()
-            self._banner_row.config(bg="")
+            self._banner_row.config(bg=self.root.cget("bg"))
 
         tk.Button(
             inner,
@@ -167,18 +167,22 @@ class DialogConverterGUI:
 
         def _do_update():
             result = updater.apply_update(download_url, progress_callback=_progress)
-            self.root.after(0, progress_win.destroy)
-            if result["success"]:
-                messagebox.showinfo(
-                    "Actualización completada",
-                    "✅ Actualización descargada correctamente.\n"
-                    "Reiniciá la app para usar la nueva versión.",
-                )
-            else:
-                messagebox.showerror(
-                    "Error al actualizar",
-                    f"No se pudo completar la actualización:\n{result.get('error', 'Error desconocido')}",
-                )
+
+            def _show_result():
+                progress_win.destroy()
+                if result["success"]:
+                    messagebox.showinfo(
+                        "Actualización completada",
+                        "Actualización descargada correctamente.\n"
+                        "Reiniciá la app para usar la nueva versión.",
+                    )
+                else:
+                    messagebox.showerror(
+                        "Error al actualizar",
+                        f"No se pudo completar la actualización:\n{result.get('error', 'Error desconocido')}",
+                    )
+
+            self.root.after(0, _show_result)
 
         threading.Thread(target=_do_update, daemon=True).start()
 
