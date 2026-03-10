@@ -70,6 +70,14 @@ class DialogConverter:
         for line_num, line in enumerate(lines, 1):
             self.current_line = line_num
             converted_line = self._convert_line(line)
+            # Detectar comillas sin cerrar: si quedan comillas dobles (rectas o
+            # tipográficas) después de la conversión, el diálogo no estaba bien formado
+            if any(c in converted_line for c in ('"', '\u201C', '\u201D')):
+                self.logger.log_warning(
+                    line_num,
+                    converted_line,
+                    "Posible comilla sin cerrar — el diálogo no pudo convertirse",
+                )
             # After finishing modifications to the line, attempt to post-process
             # spans so converted fragments are located against the final
             # converted line. This reduces deletion-only diffs.

@@ -146,6 +146,7 @@ class BatchProcessor:
                         "file": file_path.name,
                         "success": True,
                         "changes": len(converter.logger.changes),
+                        "warnings": len(converter.logger.warnings),
                         "output": output_file,
                         "log_file": log_file,
                         "json_log": str(json_log_path) if json_log_path else None,

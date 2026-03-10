@@ -15,6 +15,7 @@ class ConversionLogger:
     def __init__(self):
         # changes: list of dicts with detailed info and optional offsets
         self.changes: List[dict] = []
+        self.warnings: List[dict] = []
         self.line_number = 0
         # Threshold tuning for when to fallback to the full text
         # (useful for multi-sentence fragments). Make configurable for tests.
@@ -264,6 +265,23 @@ class ConversionLogger:
 
         self.changes.append(record)
 
+    def log_warning(self, line_num: int, text: str, message: str):
+        """
+        Registra un aviso sobre texto que no pudo convertirse correctamente.
+
+        Args:
+            line_num: Número de línea (aproximado)
+            text: Fragmento de texto problemático
+            message: Descripción del problema
+        """
+        self.warnings.append(
+            {
+                "line": line_num,
+                "text": self._format_text(text or ""),
+                "message": message,
+            }
+        )
+
     def _format_text(self, text: str) -> str:
         """
         Formatea texto para el log sin truncar, preservando saltos de línea.
@@ -294,7 +312,19 @@ class ConversionLogger:
         buffer.write("RESUMEN DE CONVERSIÓN\n")
         buffer.write("=" * 80 + "\n\n")
 
-        buffer.write(f"Total de cambios realizados: {len(self.changes)}\n\n")
+        buffer.write(f"Total de cambios realizados: {len(self.changes)}\n")
+        buffer.write(f"Total de avisos: {len(self.warnings)}\n\n")
+
+        if self.warnings:
+            buffer.write("⚠ AVISOS - Comillas sin cerrar detectadas\n")
+            buffer.write("-" * 80 + "\n\n")
+            for idx, w in enumerate(self.warnings, 1):
+                buffer.write(f"AVISO #{idx}\n")
+                buffer.write(f"Línea: ~{w['line']}\n")
+                buffer.write(f"Problema: {w['message']}\n")
+                buffer.write(f"Texto:  {w['text']}\n")
+                buffer.write("\n")
+            buffer.write("=" * 80 + "\n\n")
 
         if not self.changes:
             buffer.write("No se realizaron cambios.\n")
@@ -382,7 +412,12 @@ class ConversionLogger:
             out.append(out_rec)
 
         filepath.write_text(
-            json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(
+                {"changes": out, "warnings": self.warnings},
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
         )
 
     def save_to_file(self, filepath: Path):
