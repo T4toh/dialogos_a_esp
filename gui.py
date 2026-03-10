@@ -588,22 +588,29 @@ class DialogConverterGUI:
         """Muestra resumen de resultados con opción de ver logs."""
         success_count = sum(1 for _, success, _ in results if success)
         total = len(results)
+        warning_files = sum(
+            1 for _, success, result in results
+            if success and result.get("warnings", 0) > 0
+        )
 
         # Ventana de resultados
         result_window = tk.Toplevel(self.root)
         result_window.title("Resultados del Procesamiento")
-        result_window.geometry("900x600")
+        result_window.geometry("950x600")
 
         # Header
         header_frame = ttk.Frame(result_window, padding="10")
         header_frame.pack(fill=tk.X)
 
-        if success_count == total:
-            message = f"OK: Se procesaron exitosamente {total} archivo(s)"
-            color = "green"
-        else:
+        if success_count < total:
             message = f"AVISO: Se procesaron {success_count}/{total} archivo(s)"
             color = "orange"
+        elif warning_files > 0:
+            message = f"OK: Se procesaron {total} archivo(s) — {warning_files} con avisos de comillas"
+            color = "orange"
+        else:
+            message = f"OK: Se procesaron exitosamente {total} archivo(s)"
+            color = "green"
 
         ttk.Label(
             header_frame, text=message, font=("Helvetica", 12, "bold"), foreground=color
@@ -622,7 +629,7 @@ class DialogConverterGUI:
         vsb = ttk.Scrollbar(tree_frame, orient="vertical")
         tree = ttk.Treeview(
             tree_frame,
-            columns=("archivo", "estado", "cambios"),
+            columns=("archivo", "estado", "cambios", "avisos"),
             show="headings",
             yscrollcommand=vsb.set,
         )
@@ -631,10 +638,15 @@ class DialogConverterGUI:
         tree.heading("archivo", text="Archivo")
         tree.heading("estado", text="Estado")
         tree.heading("cambios", text="Cambios")
+        tree.heading("avisos", text="⚠ Avisos")
 
-        tree.column("archivo", width=400)
-        tree.column("estado", width=150)
-        tree.column("cambios", width=150)
+        tree.column("archivo", width=380)
+        tree.column("estado", width=120)
+        tree.column("cambios", width=120)
+        tree.column("avisos", width=120)
+
+        tree.tag_configure("warning", foreground="darkorange")
+        tree.tag_configure("error", foreground="red")
 
         # Mapeo de items a archivos de log (por nombre de archivo)
         self.result_logs = {}
@@ -649,16 +661,21 @@ class DialogConverterGUI:
             if success:
                 status = "OK"
                 changes = str(result.get("changes", 0))
+                warnings = result.get("warnings", 0)
+                avisos = str(warnings) if warnings > 0 else "-"
                 # Guardar path del log usando el nombre de archivo como clave
                 log_file = output_dir / f"{file_path.stem}_convertido.log.txt"
                 self.result_logs[filename] = log_file
+                tag = "warning" if warnings > 0 else ""
             else:
                 status = "ERROR"
                 changes = "-"
+                avisos = "-"
                 self.result_logs[filename] = None
+                tag = "error"
 
             # Insertar en el tree sin intentar modificar la columna #0
-            tree.insert("", "end", values=(filename, status, changes))
+            tree.insert("", "end", values=(filename, status, changes, avisos), tags=(tag,))
 
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         vsb.pack(side=tk.RIGHT, fill=tk.Y)
